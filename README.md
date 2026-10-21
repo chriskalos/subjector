@@ -26,5 +26,21 @@ NVIDIA hardware candidates. It does not download or install anything. A detected
 GPU is not proof that CUDA inference works. CPU fallback remains the planned
 baseline for unsupported hardware.
 
-Tests must not download dependencies or models, change the clipboard, or install
-desktop integrations.
+## Setup preview
+
+```sh
+python3 -m subjector setup --check
+```
+
+This developer command asks permission before it contacts PyPI. Press Enter or
+answer `n` to cancel without network access. After approval, it reports the latest
+stable rembg release, its declared Python requirement, and the rembg wheel size.
+It does not download packages, install software, or verify runtime compatibility.
+The reported size excludes dependencies and model weights.
+
+Package downloads use HTTPS with an explicit source list, response limits, and
+SHA-256 verification before an artifact replaces an existing file. This internal
+support is not yet connected to a runtime installer.
+
+Tests use synthetic metadata and mocked HTTP responses. They must not download
+dependencies or models, change the clipboard, or install desktop integrations.

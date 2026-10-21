@@ -8,12 +8,16 @@ from pathlib import Path
 
 from subjector.hardware import probe_nvidia
 from subjector.paths import AppPaths
+from subjector.setup import check_setup
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="subjector", description="Subjector for Linux")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("doctor", help="show local capabilities without installing anything")
+    setup = commands.add_parser("setup", help="inspect setup requirements after consent")
+    setup.add_argument("--check", action="store_true", required=True,
+                       help="read release metadata only; installation is not available yet")
     arguments = parser.parse_args(argv)
     if arguments.command is None:
         parser.print_help()
@@ -21,6 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     if sys.platform != "linux":
         print("Subjector supports Linux only.", file=sys.stderr)
         return 1
+    if arguments.command == "setup":
+        return check_setup(AppPaths.discover(os.environ, Path.home()))
     _print_diagnostics()
     return 0
 
