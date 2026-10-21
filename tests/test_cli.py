@@ -80,6 +80,16 @@ class CommandLineTests(unittest.TestCase):
             self.assertIn("doctor", output.getvalue())
             run.assert_not_called()
 
+    @patch("builtins.input", return_value="n")
+    @patch("urllib.request.OpenerDirector.open")
+    def test_install_command_honors_declined_consent(self, request, prompt):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict("os.environ", {"HOME": directory}, clear=True):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(main(["setup", "--install"]), 0)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+        request.assert_not_called()
+
     def test_unknown_commands_are_rejected(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as exit_info:
