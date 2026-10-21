@@ -1,5 +1,6 @@
 """Extract verified Python tar.gz archives into a new, private staging directory."""
 
+import gzip
 import shutil
 import tarfile
 from dataclasses import dataclass
@@ -15,6 +16,34 @@ class ExtractionLimits:
     members: int = 20_000
     file_bytes: int = 512 * 1024 * 1024
     total_bytes: int = 2 * 1024 * 1024 * 1024
+    header_bytes: int = 1024 * 1024
+
+
+class _BoundedTarStream:
+    """Limit allocations and gzip seeks before tarfile parses extended headers."""
+
+    def __init__(self, stream: gzip.GzipFile, limits: ExtractionLimits):
+        self.stream = stream
+        self.read_limit = limits.header_bytes
+        self.end_limit = limits.total_bytes + limits.members * 1024 + limits.header_bytes
+
+    def tell(self) -> int:
+        return self.stream.tell()
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        if whence not in (0, 1):
+            raise ExtractionError("Unsupported archive seek.")
+        target = offset + (self.tell() if whence == 1 else 0)
+        if not 0 <= target <= self.end_limit:
+            raise ExtractionError("The archive exceeds its decoded size limit.")
+        return self.stream.seek(target)
+
+    def read(self, size: int) -> bytes:
+        if not 0 <= size <= self.read_limit:
+            raise ExtractionError("The archive header exceeds its read limit.")
+        if self.tell() + size > self.end_limit:
+            raise ExtractionError("The archive exceeds its decoded size limit.")
+        return self.stream.read(size)
 
 
 def extract_runtime(source: Path, destination: Path,
@@ -22,19 +51,21 @@ def extract_runtime(source: Path, destination: Path,
     """Never merge with existing data. Remove staging on failure or interruption."""
     destination.mkdir(mode=0o700)
     try:
-        with tarfile.open(source, "r:gz") as archive:
-            members = _inspect_members(archive, limits)
-            _extract_members(archive, members, destination)
+        with gzip.open(source, "rb") as compressed:
+            stream = _BoundedTarStream(compressed, limits)
+            with tarfile.open(fileobj=stream, mode="r:") as archive:
+                members = _inspect_members(archive, limits)
+                _extract_members(archive, members, destination)
     except BaseException as error:
         shutil.rmtree(destination)
-        if isinstance(error, (tarfile.TarError, EOFError, ValueError)):
+        if isinstance(error, (tarfile.TarError, gzip.BadGzipFile, EOFError, ValueError)):
             raise ExtractionError("The runtime archive is invalid or truncated.") from error
         raise
 
 
 def _member_path(name: str) -> PurePosixPath:
     path = PurePosixPath(name)
-    if (not name or len(name) > 4096 or path.is_absolute()
+    if (not name or len(name) > 4096 or len(path.parts) > 64 or path.is_absolute()
             or ".." in path.parts or path == PurePosixPath(".")
             or "\\" in name or "\x00" in name):
         raise ExtractionError("The archive contains an unsafe path.")
