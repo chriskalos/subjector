@@ -24,6 +24,8 @@ class ClipboardTests(unittest.TestCase):
             source = Path("/tmp/- image with ' quotes.png")
             copy_subject(runtime, source)
             self.assertEqual(run.call_args.kwargs["input"], payload)
+            self.assertEqual(run.call_args.kwargs["stdout"], subprocess.DEVNULL)
+            self.assertEqual(run.call_args.kwargs["stderr"], subprocess.DEVNULL)
             self.assertEqual(run.call_args.args[0], ["/usr/bin/wl-copy", "--type", "image/png"])
             self.assertEqual(run.call_args_list[0].args[0][-3], str(source))
 
