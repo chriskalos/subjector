@@ -29,6 +29,7 @@ root=Path(sys.argv[1])
 im=Image.new('RGB',(80,40),'white')
 ImageDraw.Draw(im).rectangle((20,5,60,35),fill='red')
 im.save(root/'subject.png')
+im.save(root/'static.webp')
 exif=Image.Exif(); exif[274]=6
 im.save(root/'rotated.jpg',exif=exif)
 alpha=im.convert('RGBA'); alpha.putalpha(0); alpha.save(root/'transparent.png')
@@ -63,6 +64,11 @@ im.save(root/'unsupported.bmp')
             "from PIL import Image; import sys; print(len(Image.open(sys.argv[1]).getexif()))",
             str(self.root / "result.png")], text=True)
         self.assertEqual(inspection.strip(), "0")
+
+    def test_static_webp_is_supported(self):
+        result = self.run_worker("static.webp")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertEqual(json.loads(result.stdout)["size"], [80, 40])
 
     def test_existing_transparency_is_preserved(self):
         result = self.run_worker("transparent.png")
