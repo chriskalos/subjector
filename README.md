@@ -17,8 +17,14 @@ The initial code uses the Python standard library. Run commands from the
 repository root with Python 3.11 or newer.
 
 ```sh
+python3 -m subjector doctor
 python3 -m unittest discover -s tests -v
 ```
+
+`doctor` reports application storage paths, desktop/session information, and
+NVIDIA hardware candidates. It does not download or install anything. A detected
+GPU is not proof that CUDA inference works. CPU fallback remains the planned
+baseline for unsupported hardware.
 
 Tests must not download dependencies or models, change the clipboard, or install
 desktop integrations.
