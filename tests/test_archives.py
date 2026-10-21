@@ -100,6 +100,21 @@ class ArchiveTests(unittest.TestCase):
                 extract_runtime(self.archive, self.destination, limits)
             self.assertFalse(self.destination.exists())
 
+    def test_oversized_extended_headers_are_rejected_before_parsing(self):
+        with tarfile.open(self.archive, "w:gz", format=tarfile.PAX_FORMAT) as archive:
+            member = tarfile.TarInfo("file")
+            member.pax_headers = {"comment": "x" * 2048}
+            archive.addfile(member)
+        with self.assertRaisesRegex(ExtractionError, "header"):
+            extract_runtime(self.archive, self.destination, ExtractionLimits(header_bytes=512))
+        self.assertFalse(self.destination.exists())
+
+    def test_excessive_path_depth_is_rejected(self):
+        make_archive(self.archive, [("/".join(["directory"] * 100), tarfile.REGTYPE, b"file")])
+        with self.assertRaisesRegex(ExtractionError, "path"):
+            extract_runtime(self.archive, self.destination)
+        self.assertFalse(self.destination.exists())
+
     def test_corrupt_archive_leaves_no_staging(self):
         self.archive.write_bytes(b"not a gzip archive")
         with self.assertRaises(ExtractionError):
