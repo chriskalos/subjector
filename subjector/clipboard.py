@@ -33,8 +33,11 @@ def copy_subject(runtime: Path, image: Path) -> None:
             if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise CopyError("The inference worker did not produce a PNG image.")
             try:
+                # wl-copy forks a long-lived owner. Captured output pipes can
+                # remain open in that child and make communicate() wait forever.
                 subprocess.run([helper, "--type", "image/png"], input=payload,
-                               check=True, capture_output=True, timeout=15)
+                               check=True, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=15)
             except (OSError, subprocess.SubprocessError) as error:
                 raise CopyError("Could not copy the image. Use an active KDE Wayland session.") from error
 
