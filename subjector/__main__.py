@@ -1,4 +1,4 @@
-"""Developer CLI. Diagnostics never install dependencies or contact services."""
+"""Linux preview entry points. Diagnostics remain offline and read-only."""
 
 import argparse
 import os
@@ -6,6 +6,8 @@ import platform
 import sys
 from pathlib import Path
 
+from subjector.bootstrap import ensure_runtime
+from subjector.clipboard import copy_subject
 from subjector.hardware import probe_nvidia
 from subjector.paths import AppPaths
 from subjector.runtimes import RuntimeStore, RuntimeStoreError
@@ -16,9 +18,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="subjector", description="Subjector for Linux")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("doctor", help="show local capabilities without installing anything")
-    setup = commands.add_parser("setup", help="inspect setup requirements after consent")
-    setup.add_argument("--check", action="store_true", required=True,
-                       help="read release metadata only; installation is not available yet")
+    setup = commands.add_parser("setup", help="inspect or install after consent")
+    mode = setup.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--check", action="store_true", help="read release metadata only")
+    mode.add_argument("--install", action="store_true", help="download and validate a private CPU runtime")
+    commands.add_parser("gui", help="open the KDE preview").add_argument("image", nargs="?")
+    commands.add_parser("copy", help="copy one local image's subject").add_argument("image")
     arguments = parser.parse_args(argv)
     if arguments.command is None:
         parser.print_help()
@@ -26,9 +31,42 @@ def main(argv: list[str] | None = None) -> int:
     if sys.platform != "linux":
         print("Subjector supports Linux only.", file=sys.stderr)
         return 1
-    if arguments.command == "setup":
-        return check_setup(AppPaths.discover(os.environ, Path.home()))
-    return _print_diagnostics()
+    try:
+        return _dispatch(arguments)
+    except KeyboardInterrupt:
+        print("Subjector interrupted.", file=sys.stderr)
+        return 130
+    except Exception as error:
+        print(f"Subjector: {error}", file=sys.stderr)
+        return 1
+
+
+def _dispatch(arguments: argparse.Namespace) -> int:
+    if arguments.command == "doctor":
+        return _print_diagnostics()
+    if arguments.command == "gui":
+        from subjector.gui import preview
+        return preview(arguments.image)
+    paths = AppPaths.discover(os.environ, Path.home())
+    if arguments.command == "setup" and arguments.check:
+        return check_setup(paths)
+    runtime = ensure_runtime(paths, _console_confirm, print)
+    if runtime is None:
+        print("Cancelled. No runtime was installed.")
+    elif arguments.command == "copy":
+        copy_subject(runtime, Path(arguments.image))
+        print("Subject copied as a transparent PNG.")
+    else:
+        print(f"Runtime ready: {runtime}")
+    return 0
+
+
+def _console_confirm(text: str) -> bool:
+    print(text)
+    try:
+        return input("Continue? [y/N] ").strip().casefold() in {"y", "yes"}
+    except EOFError:
+        return False
 
 
 def _print_diagnostics() -> int:
