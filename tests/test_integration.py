@@ -1,4 +1,10 @@
+import json
+import shlex
+import shutil
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -25,6 +31,28 @@ class IntegrationTests(unittest.TestCase):
             remove_context_menu(paths)
             self.assertFalse(service.exists())
             self.assertTrue(application.exists())
+
+    @unittest.skipUnless(shutil.which("gio"), "requires the desktop entry launcher")
+    def test_real_desktop_launch_preserves_special_characters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record, program = root / "arguments.json", root / "capture.py"
+            program.write_text("import json,sys,pathlib\npathlib.Path(" + repr(str(record)) +
+                               ").write_text(json.dumps(sys.argv[1:]))\n")
+            launcher = root / 'launch % $ " \\ app.sh'
+            launcher.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(program))} "$@"\n')
+            launcher.chmod(0o755)
+            entry = register(AppPaths.discover({}, root), launcher, context_menu=False)
+            image = root / "- subject % ' photo.png"
+            image.write_bytes(b"fixture")
+            result = subprocess.run(["gio", "launch", str(entry), str(image)],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for _ in range(30):
+                if record.exists():
+                    break
+                time.sleep(0.1)
+            self.assertEqual(json.loads(record.read_text()), [str(image)])
 
     def test_unrelated_entries_are_never_overwritten_or_removed(self):
         with tempfile.TemporaryDirectory() as directory:
