@@ -60,9 +60,19 @@ class RuntimeStore:
                 _write_manifest(candidate, report)
                 _publish_pointer(self.root, candidate.name)
             except BaseException:
-                shutil.rmtree(candidate)
+                self._remove_unselected(candidate)
                 raise
             return candidate
+
+    def _remove_unselected(self, candidate: Path) -> None:
+        # An interruption can arrive after the atomic pointer swap succeeded.
+        # Never delete a selected runtime, or one whose selection is uncertain.
+        try:
+            active = self.current()
+        except RuntimeStoreError:
+            return
+        if active != candidate:
+            shutil.rmtree(candidate)
 
 
 def _check_directory(path: Path) -> None:
