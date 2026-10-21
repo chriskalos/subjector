@@ -18,7 +18,9 @@ def register(paths: AppPaths, launcher: Path, *, context_menu: bool) -> Path:
     launcher = launcher.resolve(strict=True)
     if not launcher.is_file() or not os.access(launcher, os.X_OK):
         raise IntegrationError("The Subjector launcher must be an executable file.")
-    command = _quote_exec(str(launcher)) + " %f"
+    # GLib checks the executable before expanding %% in its name. Keep that
+    # executable fixed; pass our shell script as an argument, never as sh -c.
+    command = "/bin/sh " + _quote_exec(str(launcher)) + " %f"
     if context_menu:
         destination = _service_path(paths)
         content = (
