@@ -24,7 +24,8 @@ python3 -m unittest discover -s tests -v
 `doctor` reports application storage paths, desktop/session information, and
 NVIDIA hardware candidates. It does not download or install anything. A detected
 GPU is not proof that CUDA inference works. CPU fallback remains the planned
-baseline for unsupported hardware.
+baseline for unsupported hardware. Diagnostics also inspect the active runtime
+record without executing it. Damaged runtime records produce a nonzero exit code.
 
 ## Setup preview
 
@@ -41,6 +42,12 @@ The reported size excludes dependencies and model weights.
 Package downloads use HTTPS with an explicit source list, response limits, and
 SHA-256 verification before an artifact replaces an existing file. This internal
 support is not yet connected to a runtime installer.
+
+Runtime staging also rejects unsafe tar paths, special files, escaping or cyclic
+links, and excessive archive expansion. Installation transactions use a per-user
+lock and activate a candidate only after validation succeeds. Failed preparation
+or validation preserves the previous runtime. These internal components use
+synthetic runtimes in tests; actual Python/rembg installation is not available yet.
 
 Tests use synthetic metadata and mocked HTTP responses. They must not download
 dependencies or models, change the clipboard, or install desktop integrations.

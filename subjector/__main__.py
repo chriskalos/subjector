@@ -8,6 +8,7 @@ from pathlib import Path
 
 from subjector.hardware import probe_nvidia
 from subjector.paths import AppPaths
+from subjector.runtimes import RuntimeStore, RuntimeStoreError
 from subjector.setup import check_setup
 
 
@@ -27,11 +28,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if arguments.command == "setup":
         return check_setup(AppPaths.discover(os.environ, Path.home()))
-    _print_diagnostics()
-    return 0
+    return _print_diagnostics()
 
 
-def _print_diagnostics() -> None:
+def _print_diagnostics() -> int:
     paths = AppPaths.discover(os.environ, Path.home())
     probe = probe_nvidia()
     print(f"Platform: Linux {platform.machine()}")
@@ -43,8 +43,18 @@ def _print_diagnostics() -> None:
     for device in probe.devices:
         print(f"NVIDIA: {device.name} (driver {device.driver})")
     print(f"Backend selection: {probe.detail}")
-    print("Inference runtime: not installed or verified by this development version.")
     print("Diagnostics do not download software or change desktop integrations.")
+    try:
+        runtime = RuntimeStore(paths.data).current()
+    except RuntimeStoreError as error:
+        print(f"Runtime state error: {error}")
+        return 1
+    if runtime is None:
+        print("Inference runtime: not installed or verified.")
+    else:
+        print(f"Active runtime: {runtime}")
+        print("The active runtime was not executed by this diagnostic check.")
+    return 0
 
 
 if __name__ == "__main__":
