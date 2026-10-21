@@ -18,7 +18,8 @@ def validate_cpu(interpreter: Path, model: Path, version: str) -> dict[str, obje
             [str(interpreter), "-I", str(worker), str(model)],
             check=True, capture_output=True, text=True, encoding="utf-8",
             errors="replace", timeout=120,
-            env={"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": str(model.parent)},
+            env={"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": str(model.parent),
+                 "U2NET_HOME": str(model.parent)},
         )
         report = json.loads(result.stdout)
         _check_report(report, version)
