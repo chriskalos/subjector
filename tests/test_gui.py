@@ -7,13 +7,17 @@ from subjector.gui import Dialogs
 
 class DialogTests(unittest.TestCase):
     @patch("subjector.gui.subprocess.run")
-    def test_confirmation_defaults_to_no_and_preserves_text_arguments(self, run):
-        run.return_value = subprocess.CompletedProcess([], 1, stdout="", stderr="")
+    def test_confirmation_requires_an_explicit_checked_approval(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, stdout="", stderr="")
         self.assertFalse(Dialogs().confirm("download $something; not a shell"))
         args = run.call_args.args[0]
-        self.assertIn("--default", args)
-        self.assertIn("No", args)
+        self.assertIn("--checklist", args)
+        self.assertEqual(args[-1], "off")
         self.assertIn("download $something; not a shell", args)
+        run.return_value.stdout = '\"allow\"\n'
+        self.assertTrue(Dialogs().confirm("Approve?"))
+        run.return_value.returncode = 1
+        self.assertFalse(Dialogs().confirm("Approve?"))
 
     @patch("subjector.gui.subprocess.run")
     def test_progress_is_updated_and_closed_through_dbus(self, run):
