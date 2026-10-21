@@ -21,7 +21,10 @@ class Dialogs:
                               capture_output=True, text=True, check=False)
 
     def confirm(self, text: str) -> bool:
-        return self.ask("--default", "No", "--yesno", text).returncode == 0
+        # kdialog's --default does not apply to yes/no dialogs. An unchecked
+        # checklist makes Enter, Escape, and window-close safe on every theme.
+        result = self.ask("--checklist", text, "allow", "I approve this network/download step", "off")
+        return result.returncode == 0 and result.stdout.strip('" \r\n') == "allow"
 
     def status(self, text: str) -> None:
         if not self.reference:
