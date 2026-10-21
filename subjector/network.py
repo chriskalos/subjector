@@ -1,4 +1,4 @@
-"""Bounded HTTPS transport for approved package sources. No implicit redirects."""
+"""Bounded HTTPS transport with one explicit GitHub release redirect policy."""
 
 import hashlib
 import os
@@ -13,7 +13,9 @@ from dataclasses import dataclass
 from http.client import HTTPException, HTTPResponse
 from pathlib import Path
 
-TRUSTED_HOSTS = frozenset({"pypi.org", "files.pythonhosted.org"})
+TRUSTED_HOSTS = frozenset({
+    "pypi.org", "files.pythonhosted.org", "github.com", "release-assets.githubusercontent.com",
+})
 SOCKET_TIMEOUT = 15
 READ_DEADLINE = 60
 CHUNK_SIZE = 64 * 1024
@@ -30,10 +32,19 @@ class Artifact:
     size: int
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl) -> None:
+class _ReleaseRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            validate_url(newurl)
+            source = urllib.parse.urlsplit(req.full_url)
+            target = urllib.parse.urlsplit(newurl)
+            if (source.hostname == "github.com" and "/releases/download/" in source.path
+                    and target.hostname == "release-assets.githubusercontent.com"):
+                return super().redirect_request(req, fp, code, msg, headers, newurl)
+        except DownloadError:
+            pass
         fp.close()
-        raise DownloadError("Download redirects are not allowed.")
+        raise DownloadError("This download redirect is not allowed.")
 
 
 def validate_url(url: str) -> None:
@@ -91,7 +102,7 @@ def _chunks(url: str, limit: int) -> Iterator[bytes]:
         raise ValueError("Download size limit must be positive.")
     deadline = time.monotonic() + READ_DEADLINE
     request = urllib.request.Request(url, headers={"User-Agent": "Subjector/0.1"})
-    opener = urllib.request.build_opener(_NoRedirect())
+    opener = urllib.request.build_opener(_ReleaseRedirect())
     try:
         with opener.open(request, timeout=SOCKET_TIMEOUT) as response:
             if response.status != 200:
