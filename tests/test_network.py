@@ -74,6 +74,18 @@ class NetworkTests(unittest.TestCase):
         self.assertTrue(response.closed)
         self.assertEqual(https_open.call_count, 1)
 
+    @patch("urllib.request.HTTPSHandler.https_open")
+    def test_github_redirect_can_reach_only_its_https_asset_host(self, https_open):
+        first = addinfourl(io.BytesIO(b""),
+                          {"location": "https://release-assets.githubusercontent.com/file?token=test"},
+                          "https://github.com/owner/repo/releases/download/tag/file", 302)
+        first.msg = "Found"
+        second = addinfourl(io.BytesIO(b"asset"), {},
+                           "https://release-assets.githubusercontent.com/file?token=test", 200)
+        second.msg = "OK"
+        https_open.side_effect = [first, second]
+        self.assertEqual(fetch_bytes(first.url, 20), b"asset")
+
     @patch("urllib.request.OpenerDirector.open")
     def test_nonpositive_limit_does_not_contact_network(self, open_request):
         with self.assertRaises(ValueError):
