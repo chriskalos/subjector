@@ -4,6 +4,7 @@ import io
 import unittest
 from unittest.mock import patch
 from urllib.error import URLError
+from urllib.response import addinfourl
 
 from subjector.network import DownloadError, fetch_bytes
 
@@ -59,6 +60,19 @@ class NetworkTests(unittest.TestCase):
         with patch("subjector.network.time.monotonic", side_effect=[0, 61]):
             with self.assertRaisesRegex(DownloadError, "time"):
                 fetch_bytes("https://pypi.org/a", 100)
+
+    @patch("urllib.request.HTTPSHandler.https_open")
+    def test_redirect_is_rejected_and_response_closed(self, https_open):
+        response = addinfourl(
+            io.BytesIO(b"redirect"), {"location": "http://untrusted.test/package"},
+            "https://pypi.org/a", 302,
+        )
+        response.msg = "Found"
+        https_open.return_value = response
+        with self.assertRaisesRegex(DownloadError, "redirect"):
+            fetch_bytes("https://pypi.org/a", 100)
+        self.assertTrue(response.closed)
+        self.assertEqual(https_open.call_count, 1)
 
     @patch("urllib.request.OpenerDirector.open")
     def test_nonpositive_limit_does_not_contact_network(self, open_request):
