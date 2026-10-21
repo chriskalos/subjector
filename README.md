@@ -46,8 +46,17 @@ support is not yet connected to a runtime installer.
 Runtime staging also rejects unsafe tar paths, special files, escaping or cyclic
 links, and excessive archive expansion. Installation transactions use a per-user
 lock and activate a candidate only after validation succeeds. Failed preparation
-or validation preserves the previous runtime. These internal components use
-synthetic runtimes in tests; actual Python/rembg installation is not available yet.
+or validation preserves the previous runtime. A late interruption after activation
+keeps the selected runtime intact.
+
+The internal CPU provisioner accepts a Python archive and model with trusted
+SHA-256 digests. It installs the verified rembg wheel and CPU dependencies only
+inside the private interpreter. Activation requires an isolated inference worker
+to produce transparent PNG data using the supplied local model.
+
+These components currently use synthetic runtimes and mocked package processes
+in tests. Real runtime installation and inference have not been verified. The
+provisioner is not yet exposed through a launcher or command-line install option.
 
 Tests use synthetic metadata and mocked HTTP responses. They must not download
 dependencies or models, change the clipboard, or install desktop integrations.
