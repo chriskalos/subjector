@@ -1,9 +1,11 @@
 """A candidate runtime must pass validation before it becomes active."""
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from subjector.runtimes import RuntimeBusy, RuntimeStore, RuntimeStoreError
 
@@ -92,6 +94,38 @@ class RuntimeStoreTests(unittest.TestCase):
                 (self.root / "active.json").write_text(payload)
                 with self.assertRaises(RuntimeStoreError):
                     self.store.current()
+
+    def test_interruption_after_pointer_swap_keeps_the_committed_runtime(self):
+        original = self.store.install(prepare_runtime, validate_runtime)
+        replace = os.replace
+
+        def replace_then_interrupt(source, destination):
+            replace(source, destination)
+            raise KeyboardInterrupt()
+
+        with patch("subjector.runtimes.os.replace", side_effect=replace_then_interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.store.install(prepare_runtime, validate_runtime)
+        self.assertNotEqual(self.store.current(), original)
+        self.assertTrue(self.store.current().is_dir())
+        self.assertTrue(original.is_dir())
+
+    def test_failed_pointer_write_leaves_the_old_runtime_selected(self):
+        original = self.store.install(prepare_runtime, validate_runtime)
+        with patch("subjector.runtimes.os.replace", side_effect=OSError("disk failure")):
+            with self.assertRaises(OSError):
+                self.store.install(prepare_runtime, validate_runtime)
+        self.assertEqual(self.store.current(), original)
+        self.assertEqual(list((self.root / "versions").iterdir()), [original])
+        self.assertEqual(list(self.root.glob(".active-*")), [])
+
+    def test_symlink_storage_root_is_rejected(self):
+        outside = Path(self.temporary.name) / "outside"
+        outside.mkdir()
+        self.root.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(RuntimeStoreError):
+            self.store.install(prepare_runtime, validate_runtime)
+        self.assertEqual(list(outside.iterdir()), [])
 
     def test_validation_must_return_a_serializable_report(self):
         for result in (None, {}, {"bad": object()}, {"bad": float("nan")}):
