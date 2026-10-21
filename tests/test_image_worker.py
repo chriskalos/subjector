@@ -2,9 +2,11 @@
 
 import json
 import os
+import struct
 import subprocess
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 RUNTIME = os.environ.get("SUBJECTOR_TEST_RUNTIME")
@@ -66,6 +68,21 @@ im.save(root/'unsupported.bmp')
         result = self.run_worker("transparent.png")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual(json.loads(result.stdout)["alpha"], [0, 0])
+
+    def test_file_size_and_pixel_limits_fail_before_inference(self):
+        with (self.root / "large.png").open("wb") as source:
+            source.truncate(50 * 1024 * 1024 + 1)
+        result = self.run_worker("large.png")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("50 MiB", json.loads(result.stdout)["error"])
+        header = struct.pack(">IIBBBBB", 10000, 10000, 8, 2, 0, 0, 0)
+        def chunk(kind, data):
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+        (self.root / "bomb.png").write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", b""))
+        result = self.run_worker("bomb.png")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("pixels", json.loads(result.stdout)["error"])
+        self.assertFalse((self.root / "result.png").exists())
 
     def test_invalid_animated_and_unsupported_images_leave_no_output(self):
         (self.root / "corrupt.png").write_bytes(b"not an image")
