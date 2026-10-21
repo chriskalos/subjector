@@ -1,11 +1,17 @@
 """Bounded HTTPS transport for approved package sources. No implicit redirects."""
 
+import hashlib
+import os
+import re
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Iterator
-from http.client import HTTPException
+from dataclasses import dataclass
+from http.client import HTTPException, HTTPResponse
+from pathlib import Path
 
 TRUSTED_HOSTS = frozenset({"pypi.org", "files.pythonhosted.org"})
 SOCKET_TIMEOUT = 15
@@ -15,6 +21,13 @@ CHUNK_SIZE = 64 * 1024
 
 class DownloadError(Exception):
     """A download failed policy, transport, or integrity validation."""
+
+
+@dataclass(frozen=True)
+class Artifact:
+    url: str
+    sha256: str
+    size: int
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -43,6 +56,32 @@ def fetch_bytes(url: str, limit: int) -> bytes:
     return b"".join(_chunks(url, limit))
 
 
+def download_verified(artifact: Artifact, destination: Path) -> None:
+    """Atomically publish a verified artifact in an existing trusted directory."""
+    validate_url(artifact.url)
+    if not re.fullmatch(r"[0-9a-f]{64}", artifact.sha256):
+        raise DownloadError("Artifact SHA-256 is invalid.")
+    if type(artifact.size) is not int or artifact.size <= 0:
+        raise DownloadError("Artifact size must be a positive integer.")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=destination.parent, prefix=".subjector-", delete=False) as output:
+            temporary = Path(output.name)
+            digest, size = hashlib.sha256(), 0
+            for chunk in _chunks(artifact.url, artifact.size):
+                output.write(chunk)
+                digest.update(chunk)
+                size += len(chunk)
+            if size != artifact.size or digest.hexdigest() != artifact.sha256:
+                raise DownloadError("Artifact size or SHA-256 verification failed.")
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, destination)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def _chunks(url: str, limit: int) -> Iterator[bytes]:
     validate_url(url)
     if limit <= 0:
@@ -59,7 +98,7 @@ def _chunks(url: str, limit: int) -> Iterator[bytes]:
         raise DownloadError("Download failed. Check your connection and try again.") from error
 
 
-def _read_chunks(response, limit: int, deadline: float) -> Iterator[bytes]:
+def _read_chunks(response: HTTPResponse, limit: int, deadline: float) -> Iterator[bytes]:
     total = 0
     while True:
         if time.monotonic() >= deadline:
