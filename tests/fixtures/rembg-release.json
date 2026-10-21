@@ -1,0 +1,19 @@
+{
+  "info": {
+    "name": "rembg",
+    "version": "2.0.85",
+    "requires_python": "<4.0,>=3.11",
+    "yanked": false
+  },
+  "urls": [
+    {
+      "filename": "rembg-2.0.85-py3-none-any.whl",
+      "packagetype": "bdist_wheel",
+      "requires_python": "<4.0,>=3.11",
+      "yanked": false,
+      "size": 12345,
+      "url": "https://files.pythonhosted.org/packages/example/rembg-2.0.85-py3-none-any.whl",
+      "digests": {"sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+    }
+  ]
+}
