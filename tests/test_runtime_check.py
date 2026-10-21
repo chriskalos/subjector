@@ -28,6 +28,7 @@ class RuntimeCheckTests(unittest.TestCase):
         self.assertEqual(arguments[-1], "/private/model.onnx")
         self.assertGreater(run.call_args.kwargs["timeout"], 0)
         self.assertNotIn("PYTHONPATH", run.call_args.kwargs["env"])
+        self.assertEqual(run.call_args.kwargs["env"]["U2NET_HOME"], "/private")
         self.assertFalse(run.call_args.kwargs.get("shell", False))
 
     @patch("subjector.runtime_check.subprocess.run")
