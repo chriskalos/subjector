@@ -37,6 +37,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def validate_url(url: str) -> None:
     """Reject URLs outside the explicit HTTPS source policy."""
+    if not isinstance(url, str):
+        raise DownloadError("Download URL must be a string.")
     try:
         parsed = urllib.parse.urlsplit(url)
         allowed = (
