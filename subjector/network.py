@@ -31,7 +31,8 @@ class Artifact:
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(self, req, fp, code, msg, headers, newurl) -> None:
+        fp.close()
         raise DownloadError("Download redirects are not allowed.")
 
 
