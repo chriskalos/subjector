@@ -250,5 +250,3 @@ Subjector builds on:
 - [AppImage](https://appimage.org/) — portable application format and build tooling.
 
 Upstream licenses apply to bundled and downloaded components. See the [AppImage third-party notices](packaging/appimage/THIRD_PARTY.md) for details and outstanding review work.
-
-**Subjector does not yet include its own license.** A project license must be selected before others can rely on permission to reuse or redistribute its code.
