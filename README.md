@@ -65,8 +65,9 @@ AppImage packaging remains deferred.
 - Output keeps the oriented image dimensions. There is no automatic subject crop.
 - X11, other file managers, multiple-image operations, and AppImage packaging
   are not implemented.
-- Closing the progress window does not cancel an in-progress installation.
-  Downloads and subprocesses have timeouts. Wait for completion or an error.
+- The progress window has a **Cancel** button. Closing it also cancels the
+  operation. Workers are terminated and partial installations are not activated.
+  A blocked network read can take up to its socket timeout before cancellation.
 - Closing Subjector does not clear the copied image. The clipboard helper keeps
   it available until something else replaces it or the desktop session ends.
 
@@ -113,7 +114,15 @@ python3 -m subjector rollback
 after permission. `setup --install` performs the prompted installation, or reuses
 a working runtime. The `copy` command requires an active Wayland desktop session.
 
+Use **Show runtime / GPU status** to see the installed version, backend, and GPU
+fallback reason without starting setup.
+
 If pasting produces nothing, try an image editor rather than a plain-text field.
+The Bazzite `/home` → `/var/home` prefix mismatch is fixed. Setup now uses a
+single canonical runtime path for both Python and pip. If an earlier attempt
+failed with a prefix or script-path error, launch Subjector again and choose
+setup; there is no need to delete the verified download cache.
+
 Use **Update or repair the runtime** to install the latest rembg into a fresh
 runtime. Use the CPU-only option if GPU support causes trouble. A successful
 update retains the previous runtime. **Restore the previous runtime** switches
@@ -141,12 +150,20 @@ SUBJECTOR_TEST_RUNTIME="/path/to/subjector/versions/runtime-id" \
 ```
 
 The real-runtime tests create temporary images and do not write to the clipboard.
-Actual setup and CPU inference were verified on this Bazzite machine. CUDA support
-validates itself during installation; this development session did not download
-the large CUDA runtime or claim a successful GPU run.
-A Wayland PNG round-trip was verified through a test-only primary-selection
-adapter, without replacing the user's normal clipboard. Final paste behavior in
-your chosen application remains an end-user acceptance check.
+Real setup was verified on this Bazzite machine using the normal `/home` path:
+Python 3.13.16, rembg 2.0.86, and ONNX Runtime 1.31.0. Both a separate CPU runtime
+and CUDA execution on an RTX 3060 passed inference validation. The installed
+runtimes used about 692 MiB (CPU) and 3.0 GiB (CUDA).
+
+The complete suite passed 90 tests, including real image decoding and inference.
+The actual `.sh` launcher and a generated Open With entry both copied a
+1000×667 transparent PNG to the normal Wayland clipboard. CPU rollback, offline
+reuse, and restoring the CUDA runtime were verified. GPU-failure recovery was
+checked with an injected unavailable device; native-crash retry has regression
+coverage. Closing a real KDE progress window cancelled its worker promptly.
+
+These checks do not replace visual paste acceptance in your chosen application,
+manual Dolphin menu acceptance, or clean-system portability testing.
 
 ## Upstream projects
 
