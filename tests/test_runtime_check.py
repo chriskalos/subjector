@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from subjector.runtime_check import RuntimeValidationError, validate_cpu
+from subjector.runtime_check import RuntimeValidationError, validate_cpu, validate_runtime
 
 
 class RuntimeCheckTests(unittest.TestCase):
@@ -60,6 +60,15 @@ class RuntimeCheckTests(unittest.TestCase):
             run.return_value.stdout = payload
             with self.assertRaises(RuntimeValidationError):
                 validate_cpu(Path("/python"), Path("/model"), "2.0.85")
+
+    @patch("subjector.runtime_check.subprocess.run")
+    def test_gpu_provider_names_alone_cannot_pass_cuda_validation(self, run):
+        report = {**self.report, "backend": "cuda", "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"]}
+        run.return_value.stdout = json.dumps(report)
+        with self.assertRaises(RuntimeValidationError):
+            validate_runtime(Path("/python"), Path("/model"), "2.0.85", backend="cuda")
+        run.return_value.stdout = json.dumps({**report, "cuda_executed": True})
+        self.assertTrue(validate_runtime(Path("/python"), Path("/model"), "2.0.85", backend="cuda")["cuda_executed"])
 
     @patch("subjector.runtime_check.subprocess.run")
     def test_missing_interpreter_crash_or_timeout_cannot_activate_a_runtime(self, run):
