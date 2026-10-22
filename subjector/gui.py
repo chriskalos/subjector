@@ -1,5 +1,6 @@
 """Small KDE preview UI using the desktop's existing kdialog and qdbus."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -89,6 +90,7 @@ def _workflow(dialogs: Dialogs, paths: AppPaths, image: str | None) -> int:
     if image is None:
         choice = dialogs.ask("--menu", "Subjector", "copy", "Choose an image and copy its subject",
                              "setup", "Set up / check runtime (automatic GPU selection)",
+                             "status", "Show runtime / GPU status",
                              "update", "Update or repair the runtime", "cpu", "Set up / repair using CPU only",
                              "rollback", "Restore the previous runtime", "register", "Add Subjector to Open With",
                              "context", "Enable Dolphin: Copy subject", "remove", "Disable Dolphin: Copy subject",
@@ -98,6 +100,10 @@ def _workflow(dialogs: Dialogs, paths: AppPaths, image: str | None) -> int:
         action = choice.stdout.strip()
     if action in {"register", "context", "remove", "unregister"}:
         _integrate(dialogs, paths, action)
+        return 0
+    if action == "status":
+        runtime = RuntimeStore(paths.data).current()
+        dialogs.ask("--msgbox", _runtime_summary(runtime) if runtime else "No runtime is installed. Choose setup first.")
         return 0
     if action == "rollback":
         runtime = RuntimeStore(paths.data).rollback()
@@ -114,8 +120,7 @@ def _workflow(dialogs: Dialogs, paths: AppPaths, image: str | None) -> int:
         return 0
     if action in {"setup", "update", "cpu"}:
         dialogs.close()
-        note = " CPU fallback is active." if (runtime / "cpu-fallback").exists() else ""
-        dialogs.ask("--msgbox", "The private runtime is ready. No image was uploaded." + note)
+        dialogs.ask("--msgbox", "The private runtime is ready. No image was uploaded.\n\n" + _runtime_summary(runtime))
         return 0
     dialogs.status("Removing the background and copying the subject…")
     copy_subject(runtime, Path(image))
@@ -125,6 +130,16 @@ def _workflow(dialogs: Dialogs, paths: AppPaths, image: str | None) -> int:
                       "Subject copied. Paste it into an image editor or document.", "4"],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     return 0
+
+
+def _runtime_summary(runtime: Path) -> str:
+    details = json.loads((runtime / "manifest.json").read_text())["validation"]
+    fallback = runtime / "cpu-fallback"
+    backend = "CPU (fallback)" if fallback.exists() else details.get("backend", "unknown").upper()
+    message = f"rembg {details.get('rembg', 'unknown')}\nBackend: {backend}\nRuntime: {runtime}"
+    if fallback.exists():
+        message += "\n\nGPU fallback reason:\n" + fallback.read_text()[:1500]
+    return message
 
 
 def _integrate(dialogs: Dialogs, paths: AppPaths, action: str) -> None:
