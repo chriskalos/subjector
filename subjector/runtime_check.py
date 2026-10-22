@@ -24,12 +24,17 @@ def validate_runtime(interpreter: Path, model: Path, version: str, *, backend: s
             check=True, capture_output=True, text=True, encoding="utf-8",
             errors="replace", timeout=120,
             env={"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": str(model.parent),
-                 "U2NET_HOME": str(model.parent)},
+                 "U2NET_HOME": str(model.parent.resolve())},
         )
         report = json.loads(result.stdout)
         _check_report(report, version, backend)
     except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError) as error:
-        raise RuntimeValidationError(f"The private {backend} runtime failed its inference check.") from error
+        detail = getattr(error, "stderr", "") or str(error)
+        if isinstance(detail, bytes):
+            detail = detail.decode("utf-8", errors="replace")
+        raise RuntimeValidationError(
+            f"The private {backend} runtime failed its inference check.\n{detail[-1500:]}"
+        ) from error
     return report
 
 

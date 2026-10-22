@@ -32,6 +32,18 @@ class RuntimeCheckTests(unittest.TestCase):
         self.assertFalse(run.call_args.kwargs.get("shell", False))
 
     @patch("subjector.runtime_check.subprocess.run")
+    def test_model_root_uses_the_same_canonical_path_as_the_worker(self, run):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            real = Path(directory) / "real"
+            real.mkdir()
+            alias = Path(directory) / "alias"
+            alias.symlink_to(real, target_is_directory=True)
+            run.return_value.stdout = json.dumps(self.report)
+            validate_cpu(Path("/python"), alias / "model.onnx", "2.0.85")
+            self.assertEqual(run.call_args.kwargs["env"]["U2NET_HOME"], str(real))
+
+    @patch("subjector.runtime_check.subprocess.run")
     def test_invalid_or_incompatible_reports_fail_validation(self, run):
         for key, value in (
             ("schema", 2), ("backend", "gpu"), ("rembg", "2.0.84"),
