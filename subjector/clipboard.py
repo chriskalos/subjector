@@ -45,16 +45,26 @@ def copy_subject(runtime: Path, image: Path) -> None:
 def _extract(runtime: Path, image: Path, output: Path) -> None:
     interpreter = runtime / "runtime/python/bin/python3"
     worker = Path(__file__).with_name("_copy_image.py").resolve()
-    try:
-        result = subprocess.run(
-            [str(interpreter), "-I", str(worker), str(image),
-             str(runtime / "model.onnx"), str(output)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
-            env={"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": str(runtime / "home"),
-                 "U2NET_HOME": str(runtime)},
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise CopyError("Image extraction failed or exceeded the two-minute limit.") from error
+    manifest = runtime / "manifest.json"
+    backend = "cpu"
+    if manifest.exists() and not (runtime / "cpu-fallback").exists():
+        backend = json.loads(manifest.read_text()).get("validation", {}).get("backend", "cpu")
+    for attempt in (["cuda", "cpu"] if backend == "cuda" else ["cpu"]):
+        try:
+            result = subprocess.run(
+                [str(interpreter), "-I", str(worker), str(image),
+                 str(runtime / "model.onnx"), str(output)],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+                env={"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": str(runtime / "home"),
+                     "U2NET_HOME": str(runtime), "SUBJECTOR_BACKEND": attempt},
+            )
+            if result.returncode >= 0 or attempt == "cpu":
+                break
+        except (OSError, subprocess.SubprocessError) as error:
+            if attempt == "cpu":
+                raise CopyError("Image extraction failed or exceeded the two-minute limit.") from error
+        (runtime / "cpu-fallback").write_text("GPU worker crashed or timed out; CPU fallback is active.")
+        output.unlink(missing_ok=True)
     if result.returncode:
         try:
             message = json.loads(result.stdout)["error"]

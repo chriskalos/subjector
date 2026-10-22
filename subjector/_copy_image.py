@@ -1,6 +1,7 @@
 """Single-image worker executed with the private runtime, not host Python."""
 
 import json
+import os
 import stat
 import sys
 import warnings
@@ -28,12 +29,20 @@ def cutout(source: Path, model: Path, destination: Path) -> dict[str, object]:
         image = ImageOps.exif_transpose(original).convert("RGBA")
     # Explicitly import our own helper despite -I excluding the script directory.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _validate_cpu import deny_network
+    from _validate_cpu import create_session, deny_network
     sys.addaudithook(deny_network)
-    from rembg import new_session, remove
+    from rembg import remove
 
-    session = new_session("u2net_custom", model_path=str(model), providers=["CPUExecutionProvider"])
-    result = remove(image.convert("RGB"), session=session).convert("RGBA")
+    backend = os.environ.get("SUBJECTOR_BACKEND", "cpu")
+    try:
+        session = create_session(model, backend)
+        result = remove(image.convert("RGB"), session=session).convert("RGBA")
+    except Exception as error:
+        if backend != "cuda":
+            raise
+        (model.parent / "cpu-fallback").write_text(str(error)[:1000])
+        session = create_session(model, "cpu")
+        result = remove(image.convert("RGB"), session=session).convert("RGBA")
     result.putalpha(ImageChops.multiply(result.getchannel("A"), image.getchannel("A")))
     result.info.clear()
     with destination.open("xb") as output:

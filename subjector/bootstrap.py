@@ -1,11 +1,12 @@
-"""Consented downloads for the Linux x86_64 CPU preview."""
+"""Consented Linux runtime acquisition with verified CUDA and CPU fallback."""
 
 import hashlib
 import platform
 from collections.abc import Callable
 from pathlib import Path
 
-from subjector.cpu_install import CpuInputs, LocalArtifact, install_cpu
+from subjector.cpu_install import CpuInputs, LocalArtifact, install_runtime
+from subjector.hardware import probe_nvidia
 from subjector.network import Artifact, download_verified
 from subjector.paths import AppPaths
 from subjector.releases import latest_rembg
@@ -25,24 +26,29 @@ MODEL = Artifact(
 
 
 def ensure_runtime(paths: AppPaths, confirm: Callable[[str], bool],
-                   status: Callable[[str], None]) -> Path | None:
+                   status: Callable[[str], None], *, refresh: bool = False,
+                   cpu_only: bool = False) -> Path | None:
     store = RuntimeStore(paths.data)
-    current = store.current()
-    if current is not None:
-        return current
+    if not refresh:
+        current = store.current()
+        if current is not None:
+            return current
     if platform.machine() not in {"x86_64", "AMD64"}:
-        raise RuntimeError("This preview supports Linux x86_64 only.")
+        raise RuntimeError("Subjector v1 supports Linux x86_64 only.")
     if not confirm("Allow Subjector to contact PyPI to check the latest rembg release?\n"
                    "This first step reads metadata only. No image is sent."):
         return None
     release = latest_rembg()
+    use_cuda = not cpu_only and bool(probe_nvidia().devices)
+    backend = "CUDA (NVIDIA), with automatic CPU fallback" if use_cuda else "CPU"
     if not confirm(
-        f"Download and run rembg {release.version} and its CPU dependencies?\n\n"
+        f"Download and run rembg {release.version}? Backend: {backend}.\n\n"
         "Also downloads Python 3.13.16 (35 MB) and U2Netp model weights (4.6 MB).\n"
-        "Dependencies can require several hundred MB. Internet is needed only for setup.\n"
+        "CPU dependencies need about 1 GB of disk; CUDA can need several GB.\n"
+        "For a smaller download, cancel and choose CPU-only setup.\n"
         "Sources: PyPI/files.pythonhosted.org and GitHub release assets.\n"
         f"Installation: {paths.data}\n\n"
-        "This preview uses CPU inference, even on NVIDIA machines. No drivers are changed.\n"
+        "No system Python or GPU drivers are changed. Failed updates preserve the old runtime.\n"
         "Images stay on your computer. Setup can take several minutes. Continue?"
     ):
         return None
@@ -51,8 +57,19 @@ def ensure_runtime(paths: AppPaths, confirm: Callable[[str], bool],
     python = _cached(PYTHON, paths.cache / "python-3.13.16.tar.gz")
     status("Downloading and verifying U2Netp model (4.6 MB)…")
     model = _cached(MODEL, paths.cache / "u2netp.onnx")
+    inputs = CpuInputs(python, model, release)
+    if use_cuda:
+        status(f"Installing rembg {release.version} with CUDA; verifying real GPU inference…")
+        try:
+            return install_runtime(store, inputs, backend="cuda", repair=refresh)
+        except Exception as error:
+            reason = str(error)[:1000]
+            status("GPU setup was unavailable. Installing the separate CPU runtime instead…")
+            runtime = install_runtime(store, inputs, repair=refresh)
+            (runtime / "cpu-fallback").write_text(reason)
+            return runtime
     status(f"Installing rembg {release.version} and CPU dependencies; then testing inference…")
-    return install_cpu(store, CpuInputs(python, model, release))
+    return install_runtime(store, inputs, repair=refresh)
 
 
 def _cached(artifact: Artifact, path: Path) -> LocalArtifact:
