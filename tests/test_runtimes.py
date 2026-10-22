@@ -27,6 +27,16 @@ class RuntimeStoreTests(unittest.TestCase):
         self.root = Path(self.temporary.name) / "subjector"
         self.store = RuntimeStore(self.root)
 
+    def test_storage_paths_are_canonical_before_any_package_installation(self):
+        actual = Path(self.temporary.name) / "actual"
+        actual.mkdir()
+        alias = Path(self.temporary.name) / "home-alias"
+        alias.symlink_to(actual, target_is_directory=True)
+        store = RuntimeStore(alias / "subjector")
+        self.assertEqual(store.root, actual / "subjector")
+        installed = store.install(lambda path: None, lambda path: {"fixture": True})
+        self.assertEqual(installed, installed.resolve())
+
     def test_discovery_does_not_create_directories(self):
         self.assertIsNone(self.store.current())
         self.assertFalse(self.root.exists())
