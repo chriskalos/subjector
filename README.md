@@ -18,8 +18,7 @@
 <p align="center">
   <a href="#get-started">Get started</a> ·
   <a href="#appimage">AppImage</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#contributing">Contributing</a>
+  <a href="#how-it-works">How it works</a>
 </p>
 
 ---
