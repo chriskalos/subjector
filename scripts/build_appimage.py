@@ -60,7 +60,8 @@ def stage(appdir: Path, archive: Path, revision: str) -> None:
     (appdir / "usr/bin").mkdir()
     (appdir / "usr/bin/subjector").symlink_to("../../AppRun")
     shutil.copy2(ROOT / "README.md", appdir / "README.md")
-    shutil.copy2(resources / "THIRD_PARTY.md", appdir / "THIRD_PARTY.md")
+    for name in ("THIRD_PARTY.md", "APPIMAGE_RUNTIME_LICENSE.txt"):
+        shutil.copy2(resources / name, appdir / name)
     metadata = {"format": 1, "channel": "unsigned-kde-test", "revision": revision,
                 "architecture": "x86_64", "python_sha256": PYTHON.sha256,
                 "appimagetool_sha256": TOOL.sha256, "runtime_sha256": RUNTIME.sha256,

@@ -14,12 +14,15 @@ The original distribution URL and SHA-256 are recorded in the build script and
 BUILD.json. Do not remove upstream license notices when modifying the image.
 
 Python licensing: https://docs.python.org/3/license.html
-Distribution licensing details: https://gregoryszorc.com/docs/python-build-standalone/main/licenses.html
+Distribution licensing details: https://gregoryszorc.com/docs/python-build-standalone/main/running.html#licensing
 
 ## AppImage runtime and build tool
 
 The image embeds the AppImage type-2 runtime, MIT license:
 https://github.com/AppImage/type2-runtime
+
+The upstream notice is included as `APPIMAGE_RUNTIME_LICENSE.txt`. It also lists
+licenses for libraries statically linked into that runtime.
 
 The image is generated with appimagetool 1.9.1. The tool itself is a build input,
 not a bundled application dependency:
