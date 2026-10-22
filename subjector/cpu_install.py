@@ -68,8 +68,12 @@ def _prepare_python(candidate: Path, inputs: CpuInputs) -> None:
     for name in ("home", "tmp"):
         (candidate / name).mkdir(mode=0o700)
     prefix = _run(candidate, ["-c", "import sys; print(sys.prefix)"]).stdout.strip()
-    if Path(prefix) != _interpreter(candidate).parent.parent:
-        raise ProvisionError("The downloaded interpreter is not using its private prefix.")
+    expected = _interpreter(candidate).parent.parent
+    # Fedora Atomic maps /home to /var/home. CPython canonicalizes its prefix,
+    # so compare directory identities, not their spelling. System prefixes
+    # still fail this check before pip can run.
+    if not Path(prefix).is_absolute() or not Path(prefix).samefile(expected):
+        raise ProvisionError(f"The interpreter prefix {prefix!r} is not the private directory {str(expected)!r}.")
 
 
 def _install_packages(candidate: Path, release: RembgRelease, backend: str) -> None:
