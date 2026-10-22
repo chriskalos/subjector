@@ -74,6 +74,25 @@ class CpuInstallTests(unittest.TestCase):
         self.assertTrue(install[-1].endswith(".whl[cpu]"))
         self.assertTrue(all(command[0].startswith(str(installed)) for command in commands))
 
+    @patch("urllib.request.OpenerDirector.open")
+    @patch("subprocess.run")
+    def test_prefix_alias_to_same_private_directory_is_accepted(self, run, open_request):
+        alias = self.root / "home-alias"
+        self.root.joinpath("actual-home").mkdir()
+        alias.symlink_to(self.root / "actual-home", target_is_directory=True)
+        self.store = RuntimeStore(alias / "subjector")
+        response = io.BytesIO(self.wheel)
+        response.status = 200
+        open_request.return_value = response
+        def invoke(command, **kwargs):
+            result = self.process_result(command, **kwargs)
+            if "-c" in command:
+                result.stdout = str(Path(result.stdout).resolve())
+            return result
+        run.side_effect = invoke
+        installed = install_cpu(self.store, self.inputs)
+        self.assertEqual(self.store.current(), installed)
+
     @patch("subprocess.run")
     def test_corrupt_local_artifact_never_executes_code(self, run):
         self.inputs.python.path.write_bytes(b"corrupt archive")
