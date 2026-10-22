@@ -44,12 +44,15 @@ class RuntimeStore:
         return runtime
 
     def install(self, prepare: Callable[[Path], None],
-                validate: Callable[[Path], dict[str, object]]) -> Path:
+                validate: Callable[[Path], dict[str, object]], *, repair: bool = False) -> Path:
         """Publish only after both callbacks succeed. Never relocate an interpreter."""
         _create_private_directory(self.root)
         with _setup_lock(self.root):
             # Refuse to overwrite corrupt state silently during repair or update.
-            self.current()
+            if not repair:
+                self.current()
+            elif (self.root / "active.json").is_symlink():
+                raise RuntimeStoreError("Remove the unexpected active.json symlink before repair.")
             versions = self.root / "versions"
             _create_private_directory(versions)
             candidate = versions / uuid.uuid4().hex
@@ -63,6 +66,22 @@ class RuntimeStore:
                 self._remove_unselected(candidate)
                 raise
             return candidate
+
+    def rollback(self) -> Path:
+        """Select the previously active, retained runtime without a download."""
+        _check_directory(self.root)
+        with _setup_lock(self.root):
+            pointer = _read_record(self.root / "active.json")
+            identifier = pointer.get("previous_id")
+            if not isinstance(identifier, str) or not re.fullmatch(r"[0-9a-f]{32}", identifier):
+                raise RuntimeStoreError("No previous runtime is available for rollback.")
+            previous = self.root / "versions" / identifier
+            _check_directory(previous.parent)
+            _check_directory(previous)
+            if not _read_record(previous / "manifest.json").get("validation"):
+                raise RuntimeStoreError("The previous runtime has no validation report.")
+            _publish_pointer(self.root, identifier)
+            return previous
 
     def _remove_unselected(self, candidate: Path) -> None:
         # An interruption can arrive after the atomic pointer swap succeeded.
@@ -126,11 +145,18 @@ def _write_manifest(candidate: Path, report: dict[str, object]) -> None:
 
 
 def _publish_pointer(root: Path, identifier: str) -> None:
+    record = {"runtime_id": identifier}
+    try:
+        previous = _read_record(root / "active.json").get("runtime_id")
+        if isinstance(previous, str) and re.fullmatch(r"[0-9a-f]{32}", previous):
+            record["previous_id"] = previous
+    except RuntimeStoreError:
+        pass
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(dir=root, prefix=".active-", delete=False) as output:
             temporary = Path(output.name)
-            output.write(_encode_record({"runtime_id": identifier}))
+            output.write(_encode_record(record))
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, root / "active.json")
