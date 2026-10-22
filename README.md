@@ -26,6 +26,7 @@ installations. Host `kdialog`, `qdbus`, and `wl-copy` are still required. It is 
 unsigned test build, not a fully self-contained or public release.
 
 ```sh
+~/Applications/Subjector.AppImage --version
 ~/Applications/Subjector.AppImage doctor
 ~/Applications/Subjector.AppImage "/path/to/photo.jpg"
 ~/Applications/Subjector.AppImage integrate                 # Open With

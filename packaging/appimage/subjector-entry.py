@@ -1,5 +1,6 @@
 """Entry point for the bundled interpreter. Never import from the caller's cwd."""
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -8,11 +9,13 @@ root = Path(__file__).resolve().parents[2]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(root / "usr/lib/subjector-app"))
 os.environ.setdefault("SUBJECTOR_LAUNCHER", str(root / "AppRun"))
+metadata = json.loads((root / "BUILD.json").read_text())
+os.environ["SUBJECTOR_BUILD"] = metadata["revision"][:12]
 
 from subjector.__main__ import main
 
 arguments = sys.argv[1:]
-commands = {"doctor", "setup", "update", "repair", "rollback", "copy", "gui", "integrate", "--help", "-h"}
+commands = {"doctor", "setup", "update", "repair", "rollback", "copy", "gui", "integrate", "--help", "-h", "--version"}
 if not arguments:
     arguments = ["gui"]
 elif arguments[0] not in commands:

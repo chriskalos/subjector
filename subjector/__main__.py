@@ -18,6 +18,8 @@ from subjector.setup import check_setup
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="subjector", description="Subjector for Linux")
+    parser.add_argument("--version", action="version",
+                        version=f"Subjector test build ({os.environ.get('SUBJECTOR_BUILD', 'source checkout')})")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("doctor", help="show local capabilities without installing anything")
     setup = commands.add_parser("setup", help="inspect or install after consent")
