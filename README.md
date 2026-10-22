@@ -4,9 +4,57 @@ Copy an image's subject, with its background removed, on Linux.
 Subjector uses [rembg](https://github.com/danielgatis/rembg) locally and puts a
 transparent PNG on the clipboard. Original images stay unchanged.
 
-## Run Subjector v1 (KDE/Wayland)
+## AppImage for long-term Bazzite testing
 
-From this repository, run:
+An unsigned x86_64 test AppImage is built at `dist/Subjector-x86_64.AppImage`.
+Move it to a permanent location before enabling desktop integration:
+
+```sh
+mkdir -p ~/Applications
+cp dist/Subjector-x86_64.AppImage ~/Applications/Subjector.AppImage
+chmod +x ~/Applications/Subjector.AppImage
+~/Applications/Subjector.AppImage
+```
+
+The AppImage includes its own Python interpreter and application code. It does
+not depend on this repository or on an installed Python. It reuses your existing
+Subjector runtime, model, and GPU setup. First-time rembg/model installation still
+requires explicit consent and an internet connection.
+
+This artifact targets **your Bazzite/KDE Wayland machine**, not arbitrary Linux
+installations. Host `kdialog`, `qdbus`, and `wl-copy` are still required. It is an
+unsigned test build, not a fully self-contained or public release.
+
+```sh
+~/Applications/Subjector.AppImage doctor
+~/Applications/Subjector.AppImage "/path/to/photo.jpg"
+~/Applications/Subjector.AppImage integrate                 # Open With
+~/Applications/Subjector.AppImage integrate --context-menu  # optional Dolphin action
+```
+
+The same registration options are in the GUI. Desktop entries point to the
+permanent AppImage path, never its temporary mount. No default associations are
+changed. If you move/rename the image, register again from the new location.
+Remove either entry by adding `--remove` to its registration command.
+
+For a later build, close Subjector's windows and replace the file at the **same
+permanent path**. AppImage updates replace application code only; runtime updates
+remain a separate consented action in Subjector. Keep the previous image if you
+want to revert application code. Runtime rollback does not roll back the AppImage.
+Do not replace the image while an extraction or setup is running.
+
+If FUSE mounting is unavailable, run:
+
+```sh
+~/Applications/Subjector.AppImage --appimage-extract-and-run
+```
+
+There is no automatic AppImage update service, signing, or AppImageLauncher
+requirement. Use the generated `.sha256` file to check a copied artifact.
+
+## Run from the repository (KDE/Wayland)
+
+Alternatively, from this repository, run:
 
 ```sh
 ./subjector.sh
@@ -43,16 +91,17 @@ Run `./subjector.sh` again:
 - Select **Disable Dolphin: Copy subject** to remove that action. Use **Remove
   Subjector from Open With** to remove the application entry separately.
 
-Keep this repository in its current location after registration. If you move it,
-run the registration actions again to update the launcher path.
+For source launches, keep this repository at its registered location. For
+AppImage launches, only the registered AppImage path needs to remain stable.
+Re-register after moving either launcher.
 
 ## Supported platform and limitations
 
 V1 targets **Linux x86_64, KDE Plasma/Dolphin, and Wayland**. The launcher currently
 uses host Python 3.11+, `kdialog`, `qdbus`, and `wl-copy`. These are already present
 on this Bazzite machine. No manual rembg, pip, CUDA, or model setup is needed.
+The test AppImage bundles Python, but still uses the listed KDE/clipboard helpers.
 **A fully self-contained cross-distribution launcher is still unfinished.**
-AppImage packaging remains deferred.
 
 - NVIDIA acceleration is enabled only after a real inference profile confirms
   CUDA kernel execution. GPU setup failure installs a separate CPU runtime.
@@ -63,8 +112,7 @@ AppImage packaging remains deferred.
 - Input is limited to one static JPEG, PNG, or WebP: at most 50 MiB and 25 million
   pixels. Animated images and other formats are rejected.
 - Output keeps the oriented image dimensions. There is no automatic subject crop.
-- X11, other file managers, multiple-image operations, and AppImage packaging
-  are not implemented.
+- X11, other file managers, and multiple-image operations are not implemented.
 - The progress window has a **Cancel** button. Closing it also cancels the
   operation. Workers are terminated and partial installations are not activated.
   A blocked network read can take up to its socket timeout before cancellation.
@@ -165,6 +213,28 @@ coverage. Closing a real KDE progress window cancelled its worker promptly.
 These checks do not replace visual paste acceptance in your chosen application,
 manual Dolphin menu acceptance, or clean-system portability testing.
 
+## Build the test AppImage
+
+On Linux x86_64 with Python 3.11+, build from this checkout:
+
+```sh
+python3 scripts/build_appimage.py
+# Reuse the existing verified Python download to save bandwidth:
+python3 scripts/build_appimage.py --python-archive ~/.cache/subjector/python-3.13.16.tar.gz
+```
+
+Run only one of those commands. The builder refuses to overwrite an existing
+output; move it aside or select `--output /another/path/Subjector.AppImage`.
+Build inputs are pinned by SHA-256. A replaced upstream asset fails verification,
+not silently accepted. The build tool uses extract-and-run, so building does not
+require FUSE. No rembg runtime, model, user data, tests, Git metadata, or local
+agent/planning files are packaged.
+
+Output: `dist/Subjector-x86_64.AppImage` and its `.sha256` file. Build caches stay
+under ignored `build/`. The image includes `BUILD.json` and third-party notices.
+See `packaging/appimage/THIRD_PARTY.md` for bundled components and licensing gaps
+that still need review before a public release.
+
 ## Upstream projects
 
 - [rembg](https://github.com/danielgatis/rembg): background removal, MIT license.
@@ -173,5 +243,6 @@ manual Dolphin menu acceptance, or clean-system portability testing.
 - [U²-Net](https://github.com/xuebinqin/U-2-Net): segmentation model project,
   Apache-2.0 source license. Model weights come from rembg's release assets.
 
-Subjector downloads these components after consent rather than committing them
-to this repository. Their upstream license terms still apply.
+The repository does not vendor these projects. The test AppImage includes a
+bootstrap Python distribution. Inference dependencies and models are acquired
+after consent. Upstream license terms apply to both bundled and downloaded code.
