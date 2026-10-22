@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Subjector
+Comment=Copy an image subject without its background
+Exec=subjector %f
+Icon=subjector
+Terminal=false
+StartupNotify=false
+Categories=Graphics;
+MimeType=image/png;image/jpeg;image/webp;

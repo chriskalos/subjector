@@ -16,7 +16,7 @@ class IntegrationError(Exception):
 
 def launcher_path() -> Path:
     """AppImage mounts disappear after exit; desktop entries must name the image."""
-    image = os.environ.get("APPIMAGE")
+    image = os.environ.get("APPIMAGE") or os.environ.get("SUBJECTOR_LAUNCHER")
     if image:
         path = Path(image)
         if not path.is_absolute():

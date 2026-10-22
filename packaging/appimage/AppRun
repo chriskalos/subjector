@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Do not change the caller's working directory: relative image paths need it.
+exec "$HERE/usr/python/bin/python3" -I "$HERE/usr/lib/subjector-entry.py" "$@"
