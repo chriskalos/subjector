@@ -10,7 +10,7 @@ from pathlib import Path
 from subjector.archives import extract_runtime
 from subjector.network import download_verified
 from subjector.releases import RembgRelease
-from subjector.runtime_check import validate_cpu
+from subjector.runtime_check import validate_runtime
 from subjector.runtimes import RuntimeStore
 
 
@@ -32,19 +32,27 @@ class CpuInputs:
 
 
 def install_cpu(store: RuntimeStore, inputs: CpuInputs) -> Path:
+    return install_runtime(store, inputs)
+
+
+def install_runtime(store: RuntimeStore, inputs: CpuInputs, *, backend: str = "cpu",
+                    repair: bool = False) -> Path:
     """Caller must obtain download/execution consent and trusted artifact hashes."""
+    if backend not in {"cpu", "cuda"}:
+        raise ValueError("Unsupported inference backend")
     def prepare(candidate: Path) -> None:
         _prepare_python(candidate, inputs)
-        _install_packages(candidate, inputs.release)
+        _install_packages(candidate, inputs.release, backend)
 
     def validate(candidate: Path) -> dict[str, object]:
-        report = validate_cpu(_interpreter(candidate), candidate / "model.onnx", inputs.release.version)
+        report = validate_runtime(_interpreter(candidate), candidate / "model.onnx",
+                                  inputs.release.version, backend=backend)
         if report["model_sha256"] != inputs.model.sha256:
             raise ProvisionError("The inference worker used an unexpected model.")
         return {**report, "python_archive_sha256": inputs.python.sha256,
                 "rembg_wheel_sha256": inputs.release.wheel.sha256, "pip_report": "pip-report.json"}
 
-    return store.install(prepare, validate)
+    return store.install(prepare, validate, repair=repair)
 
 
 def _interpreter(candidate: Path) -> Path:
@@ -64,15 +72,17 @@ def _prepare_python(candidate: Path, inputs: CpuInputs) -> None:
         raise ProvisionError("The downloaded interpreter is not using its private prefix.")
 
 
-def _install_packages(candidate: Path, release: RembgRelease) -> None:
+def _install_packages(candidate: Path, release: RembgRelease, backend: str) -> None:
     wheel = candidate / f"rembg-{release.version}-py3-none-any.whl"
     download_verified(release.wheel, wheel)
     _run(candidate, ["-m", "ensurepip", "--upgrade"])
+    packages = ([f"{wheel}[gpu]", "onnxruntime-gpu[cuda,cudnn]"]
+                if backend == "cuda" else [f"{wheel}[cpu]"])
     _run(candidate, [
         "-m", "pip", "--isolated", "--disable-pip-version-check", "--no-input",
         "install", "--quiet", "--no-cache-dir", "--only-binary=:all:",
         "--index-url", "https://pypi.org/simple", "--report", str(candidate / "pip-report.json"),
-        f"{wheel}[cpu]",
+        *packages,
     ])
     _run(candidate, ["-m", "pip", "--isolated", "--disable-pip-version-check", "check"])
     report = candidate / "pip-report.json"
@@ -89,7 +99,8 @@ def _run(candidate: Path, arguments: list[str]) -> subprocess.CompletedProcess[s
                  "TMPDIR": str(candidate / "tmp"), "PIP_CONFIG_FILE": os.devnull},
         )
     except (OSError, subprocess.SubprocessError) as error:
-        raise ProvisionError("Private Python setup failed. No candidate was activated.") from error
+        detail = getattr(error, "stderr", "") or str(error)
+        raise ProvisionError(f"Private Python setup failed. No candidate was activated.\n{detail[-1500:]}") from error
 
 
 def _copy_verified(artifact: LocalArtifact, destination: Path) -> None:
