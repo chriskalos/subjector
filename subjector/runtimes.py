@@ -27,7 +27,10 @@ class RuntimeBusy(RuntimeStoreError):
 
 class RuntimeStore:
     def __init__(self, root: Path):
-        self.root = root
+        # Keep pip's install paths and CPython's sys.prefix in one namespace.
+        # Do not resolve the final component: an unexpected store symlink must
+        # still fail the ownership/directory checks instead of being followed.
+        self.root = root.parent.resolve() / root.name
 
     def current(self) -> Path | None:
         marker = self.root / "active.json"
