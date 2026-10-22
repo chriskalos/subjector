@@ -1,13 +1,90 @@
-# Subjector
+<p align="center">
+  <img src="packaging/appimage/subjector.svg" width="112" height="112" alt="Subjector icon">
+</p>
 
-Copy an image's subject, with its background removed, on Linux.
-Subjector uses [rembg](https://github.com/danielgatis/rembg) locally and puts a
-transparent PNG on the clipboard. Original images stay unchanged.
+<h1 align="center">Subjector</h1>
 
-## AppImage for long-term Bazzite testing
+<p align="center">
+  <strong>Copy the subject. Leave the background.</strong><br>
+  Background removal straight to your Linux clipboard.
+</p>
 
-An unsigned x86_64 test AppImage is built at `dist/Subjector-x86_64.AppImage`.
-Move it to a permanent location before enabling desktop integration:
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Linux_x86__64-183c51" alt="Platform: Linux x86_64">
+  <img src="https://img.shields.io/badge/desktop-KDE_%2B_Wayland-183c51" alt="Desktop: KDE and Wayland">
+  <img src="https://img.shields.io/badge/status-experimental-e6a23c" alt="Status: experimental">
+</p>
+
+<p align="center">
+  <a href="#get-started">Get started</a> ·
+  <a href="#appimage">AppImage</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
+
+Subjector brings the idea of macOS **Copy Subject** to Linux. Choose a photo, remove its background with [rembg](https://github.com/danielgatis/rembg), and paste the subject into an image editor or document.
+
+**Your images stay on your computer. Your original files stay unchanged.**
+
+> **Early testing build.** Tested on Bazzite with KDE Plasma, Dolphin, Wayland, and an NVIDIA RTX 3060. Other distributions and desktops are not yet verified. Bug reports and small improvements are welcome.
+
+## What it does
+
+| | Feature |
+| :--- | :--- |
+| **Copy, then paste** | Places a transparent PNG on the clipboard—not a file path. |
+| **Right-click workflow** | Open an image with Subjector, or enable Dolphin’s optional **Copy subject** action. |
+| **Local inference** | No image uploads, accounts, or cloud processing. Works offline after setup. |
+| **Prompted setup** | Downloads rembg, a private Python runtime, and model dependencies after approval. |
+| **GPU when available** | Verifies real NVIDIA CUDA inference and falls back to CPU when needed. |
+| **Recovery controls** | Update, repair, select CPU-only setup, or restore the previous runtime. |
+
+## Get started
+
+### Requirements
+
+- Linux **x86_64**, with **KDE Plasma / Dolphin on Wayland**.
+- Host tools: `kdialog`, `qdbus`, and `wl-copy`.
+- Python **3.11+** for a source launch. The AppImage includes its own Python.
+- Internet for initial setup. Allow about **1 GB for CPU**, or **several GB for CUDA**.
+
+These host tools are present on the tested Bazzite machine. A fully self-contained, cross-distribution build is still a work in progress.
+
+### Run from a checkout
+
+```sh
+./subjector.sh
+```
+
+1. Select **Choose an image and copy its subject**.
+2. Choose a JPEG, PNG, or static WebP photo with a clear foreground subject.
+3. On first use, approve the metadata check and software downloads. Check the approval box in each consent dialog.
+4. Wait for **Subject copied**, then press **Ctrl+V** in an application that accepts images.
+
+For a smaller initial download, choose **Set up / repair using CPU only** first. Automatic setup attempts CUDA on detected NVIDIA hardware.
+
+You can also open an image directly:
+
+```sh
+./subjector.sh "/path/to/photo.jpg"
+```
+
+### Add the right-click actions
+
+In Subjector’s menu, select:
+
+- **Add Subjector to Open With** → Dolphin’s **Open With → Subjector**.
+- **Enable Dolphin: Copy subject** → a one-image right-click action, sometimes under **Actions**.
+
+Neither option changes your default image viewer. Both have removal options in the menu. Reopen Dolphin if a newly enabled action does not appear.
+
+## AppImage
+
+An **unsigned test AppImage** is available through the local build process below. It contains the application and bootstrap Python, but still uses the host’s KDE/clipboard helpers.
+
+After building—or receiving a test artifact—put it somewhere permanent:
 
 ```sh
 mkdir -p ~/Applications
@@ -16,234 +93,177 @@ chmod +x ~/Applications/Subjector.AppImage
 ~/Applications/Subjector.AppImage
 ```
 
-The AppImage includes its own Python interpreter and application code. It does
-not depend on this repository or on an installed Python. It reuses your existing
-Subjector runtime, model, and GPU setup. First-time rembg/model installation still
-requires explicit consent and an internet connection.
-
-This artifact targets **your Bazzite/KDE Wayland machine**, not arbitrary Linux
-installations. Host `kdialog`, `qdbus`, and `wl-copy` are still required. It is an
-unsigned test build, not a fully self-contained or public release.
+The image runs independently of this checkout and reuses existing Subjector runtimes. Register desktop integration **after** placing it at its permanent path:
 
 ```sh
-~/Applications/Subjector.AppImage --version
-~/Applications/Subjector.AppImage doctor
-~/Applications/Subjector.AppImage "/path/to/photo.jpg"
-~/Applications/Subjector.AppImage integrate                 # Open With
-~/Applications/Subjector.AppImage integrate --context-menu  # optional Dolphin action
+~/Applications/Subjector.AppImage integrate
+~/Applications/Subjector.AppImage integrate --context-menu
 ```
 
-The same registration options are in the GUI. Desktop entries point to the
-permanent AppImage path, never its temporary mount. No default associations are
-changed. If you move/rename the image, register again from the new location.
-Remove either entry by adding `--remove` to its registration command.
+Add `--remove` to either command to remove that entry. The same controls are in the GUI. If you move the AppImage, register again from the new location.
 
-For a later build, close Subjector's windows and replace the file at the **same
-permanent path**. AppImage updates replace application code only; runtime updates
-remain a separate consented action in Subjector. Keep the previous image if you
-want to revert application code. Runtime rollback does not roll back the AppImage.
-Do not replace the image while an extraction or setup is running.
+<details>
+<summary><strong>Build, verify, and update an AppImage</strong></summary>
 
-If FUSE mounting is unavailable, run:
+Build on Linux x86_64 with Python 3.11+:
+
+```sh
+python3 scripts/build_appimage.py
+```
+
+If setup already downloaded the bootstrap Python, reuse it:
+
+```sh
+python3 scripts/build_appimage.py \
+  --python-archive ~/.cache/subjector/python-3.13.16.tar.gz
+```
+
+Run one build command, not both. The builder refuses to overwrite an existing artifact. Move the old output aside or pass `--output /another/path/Subjector.AppImage`.
+
+Outputs:
+
+- `dist/Subjector-x86_64.AppImage`
+- `dist/Subjector-x86_64.AppImage.sha256`
+
+Check the artifact before copying it:
+
+```sh
+cd dist
+sha256sum -c Subjector-x86_64.AppImage.sha256
+```
+
+Build inputs have pinned SHA-256 checksums. The builder includes `BUILD.json` and third-party notices, but excludes user data, inference runtimes, models, tests, and repository metadata.
+
+To update application code, close Subjector and replace the image at the same permanent path. Keep the previous image if you want to revert. Do not replace it during setup or image processing.
+
+AppImage replacement and inference-runtime updates are separate. Runtime rollback does not restore an older AppImage. There is no automatic AppImage updater or signing yet.
+
+If FUSE is unavailable:
 
 ```sh
 ~/Applications/Subjector.AppImage --appimage-extract-and-run
 ```
 
-There is no automatic AppImage update service, signing, or AppImageLauncher
-requirement. Use the generated `.sha256` file to check a copied artifact.
+Building also uses extract-and-run and does not require FUSE.
 
-## Run from the repository (KDE/Wayland)
+</details>
 
-Alternatively, from this repository, run:
+## How it works
+
+**Image → local rembg inference → transparent PNG → clipboard**
+
+First setup checks PyPI for the latest stable rembg release, then installs it into an application-owned runtime. Python and model downloads have pinned SHA-256 checksums. Setup activates a runtime only after inference validation succeeds.
+
+The current model is **U2Netp**, chosen for its small download. Output keeps the image’s oriented dimensions and existing transparency, while removing EXIF metadata.
+
+NVIDIA setup requires profile evidence of CUDA kernel execution—not just a detected GPU. Failed GPU setup installs a separate CPU runtime. GPU errors during copying retry on CPU and save the fallback for later copies.
+
+AMD, Intel, and undetected GPUs use CPU. Subjector does not change system Python or install GPU drivers. Clipboard ownership continues after the application exits.
+
+<details>
+<summary><strong>Downloads and local storage</strong></summary>
+
+Setup downloads Python 3.13.16 (about 35 MB), U2Netp weights (about 4.6 MB), rembg, and the selected backend’s dependencies. Sources are PyPI, Python-hosted packages, and official GitHub release assets.
+
+The verified rembg 2.0.86 installation used about **692 MiB for CPU** and **3.0 GiB for CUDA**. Future dependency versions can differ. The AppImage is about **32 MB** and does not bundle those inference dependencies.
+
+Default paths respect XDG overrides:
+
+| Data | Default location |
+| :--- | :--- |
+| Runtimes and models | `~/.local/share/subjector/` |
+| Download cache | `~/.cache/subjector/` |
+| Open With entry | `~/.local/share/applications/subjector.desktop` |
+| Dolphin action | `~/.local/share/kio/servicemenus/subjector.desktop` |
+
+To uninstall, remove both desktop integrations using Subjector, then remove its runtime/cache directories and the AppImage or checkout. Original images are not stored in those directories.
+
+</details>
+
+## Current limits
+
+- One static JPEG, PNG, or WebP at a time: at most **50 MiB** and **25 million pixels**.
+- No manual subject selection, automatic crop, batch processing, X11, or other file-manager integrations.
+- Fine hair, busy backgrounds, and small objects can challenge the lightweight model. This is not a promise of Apple-quality results.
+- Cancel or close the progress window to stop an operation. A blocked network read can take up to its socket timeout to stop.
+- Clean-system portability, broader quality testing, and the final licensing/security review remain open. This is not a production-ready release.
+
+## Troubleshooting
+
+Use **Show runtime / GPU status** in the GUI, or run:
 
 ```sh
-./subjector.sh
+~/Applications/Subjector.AppImage --version
+~/Applications/Subjector.AppImage doctor
 ```
 
-1. Select **Choose an image and copy its subject**.
-2. Choose a JPEG, PNG, or static WebP photo with a clear foreground subject.
-3. On first use, approve the metadata check. Then approve the software downloads.
-   In each consent dialog, check the approval box and click **OK**.
-4. Wait for **Subject copied**. Initial setup can take several minutes.
-5. Paste with **Ctrl+V** into an image editor or a document application that
-   accepts images. The background should be transparent.
+`doctor` is offline and read-only. If pasting appears to do nothing, try an image editor rather than a plain-text field.
 
-You can also open a specific image directly:
+Use **Update or repair the runtime** for a fresh installation, or the CPU-only option for GPU trouble. A successful update retains the previous runtime; **Restore the previous runtime** switches back without downloads.
 
-```sh
-./subjector.sh "/absolute/path/to/photo.jpg"
-```
+<details>
+<summary><strong>Terminal commands</strong></summary>
 
-After setup, the installed runtime and model work offline. For the quickest first
-test, choose **Set up / repair using CPU only** before choosing an image. Automatic
-setup detects NVIDIA candidates, attempts CUDA, and falls back to CPU if real GPU
-inference cannot be verified.
-
-### Open With and Dolphin
-
-Run `./subjector.sh` again:
-
-- Select **Add Subjector to Open With**. In Dolphin, right-click an image and
-  choose **Open With → Subjector**. It does not change the default image viewer.
-- Select **Enable Dolphin: Copy subject** to add the optional right-click action.
-  The action applies to one selected local image. Check Dolphin's **Actions**
-  submenu if it is not at the top level. Reopen Dolphin if needed.
-- Select **Disable Dolphin: Copy subject** to remove that action. Use **Remove
-  Subjector from Open With** to remove the application entry separately.
-
-For source launches, keep this repository at its registered location. For
-AppImage launches, only the registered AppImage path needs to remain stable.
-Re-register after moving either launcher.
-
-## Supported platform and limitations
-
-V1 targets **Linux x86_64, KDE Plasma/Dolphin, and Wayland**. The launcher currently
-uses host Python 3.11+, `kdialog`, `qdbus`, and `wl-copy`. These are already present
-on this Bazzite machine. No manual rembg, pip, CUDA, or model setup is needed.
-The test AppImage bundles Python, but still uses the listed KDE/clipboard helpers.
-**A fully self-contained cross-distribution launcher is still unfinished.**
-
-- NVIDIA acceleration is enabled only after a real inference profile confirms
-  CUDA kernel execution. GPU setup failure installs a separate CPU runtime.
-  GPU errors during copying retry on CPU and retain that fallback for later copies.
-  AMD, Intel, and undetected GPUs use CPU. Host drivers are never installed or changed.
-- The small **U2Netp** model makes first setup quicker. Fine hair, busy backgrounds,
-  and small objects can need a stronger model. This is not Apple-quality parity.
-- Input is limited to one static JPEG, PNG, or WebP: at most 50 MiB and 25 million
-  pixels. Animated images and other formats are rejected.
-- Output keeps the oriented image dimensions. There is no automatic subject crop.
-- X11, other file managers, and multiple-image operations are not implemented.
-- The progress window has a **Cancel** button. Closing it also cancels the
-  operation. Workers are terminated and partial installations are not activated.
-  A blocked network read can take up to its socket timeout before cancellation.
-- Closing Subjector does not clear the copied image. The clipboard helper keeps
-  it available until something else replaces it or the desktop session ends.
-
-## What setup downloads
-
-Subjector asks before network access and installation. It resolves the latest
-stable rembg release from PyPI, then installs it into an application-owned Python
-runtime. It does not change system Python or install GPU drivers.
-
-Setup downloads Python 3.13.16 (about 35 MB), U2Netp (about 4.6 MB), rembg,
-and the selected backend's dependencies. Allow about 1 GB for CPU, or several GB
-for CUDA. The tested CPU installation used 688 MiB plus 39 MiB of cached downloads;
-future dependency versions can differ.
-Sources are
-PyPI, Python-hosted package files, and official GitHub release assets. Python and
-model artifacts have pinned SHA-256 checksums. rembg's wheel checksum comes from
-PyPI metadata. pip records installed dependencies and artifact provenance.
-
-Images are not uploaded. Inference uses the explicitly selected local model.
-Setup activates a runtime only after a local inference check succeeds. Failed
-preparation preserves the previous runtime.
-
-Default locations, with XDG overrides respected:
-
-- Runtime and model: `~/.local/share/subjector/`
-- Download cache: `~/.cache/subjector/`
-- Open With entry: `~/.local/share/applications/subjector.desktop`
-- Dolphin action: `~/.local/share/kio/servicemenus/subjector.desktop`
-
-## Terminal commands and troubleshooting
+From a checkout:
 
 ```sh
-python3 -m subjector doctor
 python3 -m subjector setup --check
 python3 -m subjector setup --install
 python3 -m subjector setup --install --cpu
-python3 -m subjector copy -- "/absolute/path/to/photo.jpg"
+python3 -m subjector copy -- "/path/to/photo.jpg"
 python3 -m subjector update
 python3 -m subjector repair --cpu
 python3 -m subjector rollback
 ```
 
-`doctor` is offline and read-only. `setup --check` only reads release metadata
-after permission. `setup --install` performs the prompted installation, or reuses
-a working runtime. The `copy` command requires an active Wayland desktop session.
+For an AppImage, replace `python3 -m subjector` with its executable path. `setup --check` retrieves metadata only, after permission. Normal image copying reuses the installed runtime offline.
 
-Use **Show runtime / GPU status** to see the installed version, backend, and GPU
-fallback reason without starting setup.
+Bazzite’s `/home` → `/var/home` prefix mismatch is fixed. If an older build failed with a prefix/script-path error, retry setup with the current build. There is no need to delete the verified download cache.
 
-If pasting produces nothing, try an image editor rather than a plain-text field.
-The Bazzite `/home` → `/var/home` prefix mismatch is fixed. Setup now uses a
-single canonical runtime path for both Python and pip. If an earlier attempt
-failed with a prefix or script-path error, launch Subjector again and choose
-setup; there is no need to delete the verified download cache.
+</details>
 
-Use **Update or repair the runtime** to install the latest rembg into a fresh
-runtime. Use the CPU-only option if GPU support causes trouble. A successful
-update retains the previous runtime. **Restore the previous runtime** switches
-back without downloads. Failed updates leave the existing selection unchanged.
-`doctor` reports the active backend and any saved CPU-fallback reason.
+## Contributing
 
-To remove Subjector, disable both desktop integrations in its menu, then remove
-its runtime and cache directories listed above. Original images are never stored
-or changed there.
+Friends, testers, and contributors are welcome. Small, focused pull requests are easier to review than large rewrites.
 
-## Development and verification
+Useful places to help:
 
-Run the fast tests without downloads or clipboard changes:
+- **Desktop compatibility:** verify additional distributions, compositors, and file managers.
+- **Packaging:** remove the remaining host-helper requirements and improve clean-system startup.
+- **Image quality:** evaluate stronger models, difficult edges, and subject cropping.
+- **Reliability:** improve recovery, cancellation, diagnostics, and regression coverage.
+- **User experience:** polish dialogs, accessibility, and the right-click workflow.
+
+For bug reports, include your desktop/session, build version, `doctor` output, and steps to reproduce. Include an example image only if you have permission to share it. Redact personal paths from diagnostics if needed.
+
+### Run the tests
+
+The default suite does not download models or change the clipboard:
 
 ```sh
 python3 -m unittest discover -s tests -v
 ```
 
-Real image-worker tests require an explicitly prepared runtime. Set the path
-reported as **Active runtime** by `doctor`:
+Real image tests require a prepared runtime. Use the **Active runtime** path from `doctor`:
 
 ```sh
 SUBJECTOR_TEST_RUNTIME="/path/to/subjector/versions/runtime-id" \
   python3 -m unittest discover -s tests -v
 ```
 
-The real-runtime tests create temporary images and do not write to the clipboard.
-Real setup was verified on this Bazzite machine using the normal `/home` path:
-Python 3.13.16, rembg 2.0.86, and ONNX Runtime 1.31.0. Both a separate CPU runtime
-and CUDA execution on an RTX 3060 passed inference validation. The installed
-runtimes used about 692 MiB (CPU) and 3.0 GiB (CUDA).
+Real-runtime tests create temporary images without writing to the clipboard. Local verification covered CPU/CUDA inference, rollback, offline reuse, AppImage relocation, Open With, and normal Wayland clipboard output.
 
-The complete suite passed 90 tests, including real image decoding and inference.
-The actual `.sh` launcher and a generated Open With entry both copied a
-1000×667 transparent PNG to the normal Wayland clipboard. CPU rollback, offline
-reuse, and restoring the CUDA runtime were verified. GPU-failure recovery was
-checked with an injected unavailable device; native-crash retry has regression
-coverage. Closing a real KDE progress window cancelled its worker promptly.
+Please test visual paste behavior and Dolphin’s actual menu interaction too. Automated checks do not replace those acceptance tests.
 
-These checks do not replace visual paste acceptance in your chosen application,
-manual Dolphin menu acceptance, or clean-system portability testing.
+## Credits & licensing
 
-## Build the test AppImage
+Subjector builds on:
 
-On Linux x86_64 with Python 3.11+, build from this checkout:
+- [rembg](https://github.com/danielgatis/rembg) — background removal, MIT license.
+- [U²-Net](https://github.com/xuebinqin/U-2-Net) — segmentation project, Apache-2.0 source license. Model weights come from rembg release assets.
+- [python-build-standalone](https://github.com/astral-sh/python-build-standalone) — private Python distributions.
+- [AppImage](https://appimage.org/) — portable application format and build tooling.
 
-```sh
-python3 scripts/build_appimage.py
-# Reuse the existing verified Python download to save bandwidth:
-python3 scripts/build_appimage.py --python-archive ~/.cache/subjector/python-3.13.16.tar.gz
-```
+Upstream licenses apply to bundled and downloaded components. See the [AppImage third-party notices](packaging/appimage/THIRD_PARTY.md) for details and outstanding review work.
 
-Run only one of those commands. The builder refuses to overwrite an existing
-output; move it aside or select `--output /another/path/Subjector.AppImage`.
-Build inputs are pinned by SHA-256. A replaced upstream asset fails verification,
-not silently accepted. The build tool uses extract-and-run, so building does not
-require FUSE. No rembg runtime, model, user data, tests, Git metadata, or local
-agent/planning files are packaged.
-
-Output: `dist/Subjector-x86_64.AppImage` and its `.sha256` file. Build caches stay
-under ignored `build/`. The image includes `BUILD.json` and third-party notices.
-See `packaging/appimage/THIRD_PARTY.md` for bundled components and licensing gaps
-that still need review before a public release.
-
-## Upstream projects
-
-- [rembg](https://github.com/danielgatis/rembg): background removal, MIT license.
-- [python-build-standalone](https://github.com/astral-sh/python-build-standalone):
-  private Python distribution with its upstream license notices.
-- [U²-Net](https://github.com/xuebinqin/U-2-Net): segmentation model project,
-  Apache-2.0 source license. Model weights come from rembg's release assets.
-
-The repository does not vendor these projects. The test AppImage includes a
-bootstrap Python distribution. Inference dependencies and models are acquired
-after consent. Upstream license terms apply to both bundled and downloaded code.
+**Subjector does not yet include its own license.** A project license must be selected before others can rely on permission to reuse or redistribute its code.
