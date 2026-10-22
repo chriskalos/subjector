@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from subjector.operations import checkpoint, run_process
+
 
 class CopyError(Exception):
     """The subject could not be extracted or copied."""
@@ -29,6 +31,7 @@ def copy_subject(runtime: Path, image: Path) -> None:
             _extract(runtime, image.absolute(), output)
             if output.stat().st_size > 128 * 1024 * 1024:
                 raise CopyError("The extracted image is too large for this preview.")
+            checkpoint()
             payload = output.read_bytes()
             if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise CopyError("The inference worker did not produce a PNG image.")
@@ -51,7 +54,7 @@ def _extract(runtime: Path, image: Path, output: Path) -> None:
         backend = json.loads(manifest.read_text()).get("validation", {}).get("backend", "cpu")
     for attempt in (["cuda", "cpu"] if backend == "cuda" else ["cpu"]):
         try:
-            result = subprocess.run(
+            result = run_process(
                 [str(interpreter), "-I", str(worker), str(image),
                  str(runtime / "model.onnx"), str(output)],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,

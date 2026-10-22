@@ -12,6 +12,8 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from subjector.operations import checkpoint
+
 MANIFEST_LIMIT = 64 * 1024
 
 
@@ -61,6 +63,7 @@ class RuntimeStore:
                 prepare(candidate)
                 report = validate(candidate)
                 _write_manifest(candidate, report)
+                checkpoint()
                 _publish_pointer(self.root, candidate.name)
             except BaseException:
                 self._remove_unselected(candidate)

@@ -6,6 +6,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from subjector.operations import run_process
+
 
 class RuntimeValidationError(Exception):
     """A private runtime failed its offline inference check."""
@@ -19,7 +21,7 @@ def validate_runtime(interpreter: Path, model: Path, version: str, *, backend: s
     worker = Path(__file__).with_name("_validate_cpu.py").resolve()
     flags = ["--cuda"] if backend == "cuda" else []
     try:
-        result = subprocess.run(
+        result = run_process(
             [str(interpreter), "-I", str(worker), *flags, str(model)],
             check=True, capture_output=True, text=True, encoding="utf-8",
             errors="replace", timeout=120,

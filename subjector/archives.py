@@ -6,6 +6,8 @@ import tarfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from subjector.operations import checkpoint
+
 
 class ExtractionError(Exception):
     """An archive cannot be safely extracted under the runtime policy."""
@@ -77,6 +79,7 @@ def _inspect_members(archive: tarfile.TarFile,
     members = {}
     total = 0
     for member in archive:
+        checkpoint()
         path = _member_path(member.name)
         if path in members or len(members) >= limits.members:
             raise ExtractionError("The archive has duplicate paths or too many entries.")
@@ -96,6 +99,7 @@ def _inspect_members(archive: tarfile.TarFile,
 def _extract_members(archive: tarfile.TarFile,
                      members: dict[PurePosixPath, tarfile.TarInfo], root: Path) -> None:
     for path, member in members.items():
+        checkpoint()
         target = root / path
         _private_directories(target.parent, root)
         if member.isdir():

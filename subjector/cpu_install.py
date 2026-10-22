@@ -9,6 +9,7 @@ from pathlib import Path
 
 from subjector.archives import extract_runtime
 from subjector.network import download_verified
+from subjector.operations import checkpoint, run_process
 from subjector.releases import RembgRelease
 from subjector.runtime_check import validate_runtime
 from subjector.runtimes import RuntimeStore
@@ -96,7 +97,7 @@ def _install_packages(candidate: Path, release: RembgRelease, backend: str) -> N
 
 def _run(candidate: Path, arguments: list[str]) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(
+        return run_process(
             [str(_interpreter(candidate)), "-I", *arguments], check=True,
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
             env={"PATH": os.defpath, "LANG": "C.UTF-8", "HOME": str(candidate / "home"),
@@ -113,6 +114,7 @@ def _copy_verified(artifact: LocalArtifact, destination: Path) -> None:
     digest, total = hashlib.sha256(), 0
     with artifact.path.open("rb") as source, destination.open("xb") as output:
         while chunk := source.read(64 * 1024):
+            checkpoint()
             total += len(chunk)
             if total > 512 * 1024 * 1024:
                 raise ProvisionError("The local artifact exceeds the 512 MiB limit.")

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from subjector.cpu_install import CpuInputs, LocalArtifact, install_runtime
 from subjector.hardware import probe_nvidia
+from subjector.operations import OperationCancelled
 from subjector.network import Artifact, download_verified
 from subjector.paths import AppPaths
 from subjector.releases import latest_rembg
@@ -62,6 +63,8 @@ def ensure_runtime(paths: AppPaths, confirm: Callable[[str], bool],
         status(f"Installing rembg {release.version} with CUDA; verifying real GPU inference…")
         try:
             return install_runtime(store, inputs, backend="cuda", repair=refresh)
+        except OperationCancelled:
+            raise
         except Exception as error:
             reason = str(error)[:1000]
             status("GPU setup was unavailable. Installing the separate CPU runtime instead…")

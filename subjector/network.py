@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from http.client import HTTPException, HTTPResponse
 from pathlib import Path
 
+from subjector.operations import checkpoint
+
 TRUSTED_HOSTS = frozenset({
     "pypi.org", "files.pythonhosted.org", "github.com", "release-assets.githubusercontent.com",
 })
@@ -115,6 +117,7 @@ def _chunks(url: str, limit: int) -> Iterator[bytes]:
 def _read_chunks(response: HTTPResponse, limit: int, deadline: float) -> Iterator[bytes]:
     total = 0
     while True:
+        checkpoint()
         if time.monotonic() >= deadline:
             raise DownloadError("Download exceeded its time limit.")
         # read1 returns available data so a slow stream cannot hide the deadline.
