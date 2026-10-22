@@ -4,6 +4,7 @@ import hashlib
 import importlib.metadata
 import io
 import json
+import os
 import platform
 import sys
 from pathlib import Path
@@ -16,6 +17,8 @@ def deny_network(event: str, arguments: tuple) -> None:
 
 
 def create_session(model: Path, backend: str = "cpu", *, profile: bool = False):
+    model = model.resolve(strict=True)
+    os.environ["U2NET_HOME"] = str(model.parent)
     from rembg import new_session
     if backend == "cpu":
         return new_session("u2net_custom", model_path=str(model), providers=["CPUExecutionProvider"])
