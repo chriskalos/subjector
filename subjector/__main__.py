@@ -10,6 +10,7 @@ from pathlib import Path
 from subjector.bootstrap import ensure_runtime
 from subjector.clipboard import copy_subject
 from subjector.hardware import probe_nvidia
+from subjector.integration import launcher_path, register, remove_context_menu, remove_open_with
 from subjector.paths import AppPaths
 from subjector.runtimes import RuntimeStore, RuntimeStoreError
 from subjector.setup import check_setup
@@ -28,6 +29,9 @@ def main(argv: list[str] | None = None) -> int:
         commands.add_parser(command, help="rebuild the latest runtime after consent").add_argument(
             "--cpu", action="store_true", help="force CPU-only installation")
     commands.add_parser("rollback", help="restore the previous runtime without downloads")
+    integrate = commands.add_parser("integrate", help="register the current launcher without changing default associations")
+    integrate.add_argument("--context-menu", action="store_true", help="manage the optional Dolphin action")
+    integrate.add_argument("--remove", action="store_true", help="remove the selected desktop entry")
     commands.add_parser("gui", help="open the KDE preview").add_argument("image", nargs="?")
     commands.add_parser("copy", help="copy one local image's subject").add_argument("image")
     arguments = parser.parse_args(argv)
@@ -54,6 +58,13 @@ def _dispatch(arguments: argparse.Namespace) -> int:
         from subjector.gui import preview
         return preview(arguments.image)
     paths = AppPaths.discover(os.environ, Path.home())
+    if arguments.command == "integrate":
+        if arguments.remove:
+            (remove_context_menu if arguments.context_menu else remove_open_with)(paths)
+            print("Desktop entry removed.")
+        else:
+            print(f"Installed: {register(paths, launcher_path(), context_menu=arguments.context_menu)}")
+        return 0
     if arguments.command == "rollback":
         print(f"Runtime selected: {RuntimeStore(paths.data).rollback()}")
         return 0

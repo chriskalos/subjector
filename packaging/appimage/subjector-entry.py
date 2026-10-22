@@ -12,7 +12,7 @@ os.environ.setdefault("SUBJECTOR_LAUNCHER", str(root / "AppRun"))
 from subjector.__main__ import main
 
 arguments = sys.argv[1:]
-commands = {"doctor", "setup", "update", "repair", "rollback", "copy", "gui", "--help", "-h"}
+commands = {"doctor", "setup", "update", "repair", "rollback", "copy", "gui", "integrate", "--help", "-h"}
 if not arguments:
     arguments = ["gui"]
 elif arguments[0] not in commands:

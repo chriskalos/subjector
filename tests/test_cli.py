@@ -90,6 +90,21 @@ class CommandLineTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [])
         request.assert_not_called()
 
+    def test_explicit_desktop_integration_never_starts_setup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            launcher = Path(directory) / "Subjector.AppImage"
+            launcher.write_bytes(b"ELF fixture")
+            launcher.chmod(0o755)
+            with patch.dict("os.environ", {"XDG_DATA_HOME": directory, "APPIMAGE": str(launcher)}):
+                with patch("urllib.request.OpenerDirector.open") as request:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        self.assertEqual(main(["integrate"]), 0)
+                        entry = Path(directory) / "applications/subjector.desktop"
+                        self.assertIn(str(launcher), entry.read_text())
+                        self.assertEqual(main(["integrate", "--remove"]), 0)
+                        self.assertFalse(entry.exists())
+                request.assert_not_called()
+
     def test_unknown_commands_are_rejected(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as exit_info:
