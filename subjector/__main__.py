@@ -92,7 +92,7 @@ def _print_diagnostics() -> int:
     print(f"Cache: {paths.cache}")
     for device in probe.devices:
         print(f"NVIDIA: {device.name} (driver {device.driver})")
-    print(f"Backend selection: {probe.detail}")
+    print(f"Hardware-only probe: {probe.detail}")
     print("Diagnostics do not download software or change desktop integrations.")
     try:
         runtime = RuntimeStore(paths.data).current()
@@ -106,6 +106,9 @@ def _print_diagnostics() -> int:
         details = json.loads((runtime / "manifest.json").read_text())["validation"]
         fallback = runtime / "cpu-fallback"
         print(f"Backend: {'cpu (fallback)' if fallback.exists() else details.get('backend', 'unknown')}")
+        print(f"rembg: {details.get('rembg', 'unknown')}")
+        if details.get("cuda_executed") and not fallback.exists():
+            print("Installation validation: CUDA kernel execution verified.")
         if fallback.exists():
             print(f"Fallback reason: {fallback.read_text()[:1000]}")
         print("The active runtime was not executed by this diagnostic check.")
