@@ -10,7 +10,7 @@ from pathlib import Path
 
 from subjector.bootstrap import ensure_runtime
 from subjector.clipboard import copy_subject
-from subjector.integration import register, remove_context_menu, remove_open_with
+from subjector.integration import launcher_path, register, remove_context_menu, remove_open_with
 from subjector.runtimes import RuntimeStore
 from subjector.paths import AppPaths
 from subjector.operations import OperationCancelled, cancellable
@@ -143,7 +143,7 @@ def _runtime_summary(runtime: Path) -> str:
 
 
 def _integrate(dialogs: Dialogs, paths: AppPaths, action: str) -> None:
-    launcher = Path(__file__).resolve().parents[1] / "subjector.sh"
+    launcher = launcher_path()
     if action == "remove":
         remove_context_menu(paths)
         message = "The Subjector context-menu action was removed. Open With is unchanged."
