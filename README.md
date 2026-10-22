@@ -222,20 +222,6 @@ Bazzite’s `/home` → `/var/home` prefix mismatch is fixed. If an older build 
 
 </details>
 
-## Contributing
-
-Friends, testers, and contributors are welcome. Small, focused pull requests are easier to review than large rewrites.
-
-Useful places to help:
-
-- **Desktop compatibility:** verify additional distributions, compositors, and file managers.
-- **Packaging:** remove the remaining host-helper requirements and improve clean-system startup.
-- **Image quality:** evaluate stronger models, difficult edges, and subject cropping.
-- **Reliability:** improve recovery, cancellation, diagnostics, and regression coverage.
-- **User experience:** polish dialogs, accessibility, and the right-click workflow.
-
-For bug reports, include your desktop/session, build version, `doctor` output, and steps to reproduce. Include an example image only if you have permission to share it. Redact personal paths from diagnostics if needed.
-
 ### Run the tests
 
 The default suite does not download models or change the clipboard:
