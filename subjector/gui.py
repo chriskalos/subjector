@@ -8,7 +8,8 @@ from pathlib import Path
 
 from subjector.bootstrap import ensure_runtime
 from subjector.clipboard import copy_subject
-from subjector.integration import register, remove_context_menu
+from subjector.integration import register, remove_context_menu, remove_open_with
+from subjector.runtimes import RuntimeStore
 from subjector.paths import AppPaths
 
 
@@ -23,7 +24,7 @@ class Dialogs:
     def confirm(self, text: str) -> bool:
         # kdialog's --default does not apply to yes/no dialogs. An unchecked
         # checklist makes Enter, Escape, and window-close safe on every theme.
-        result = self.ask("--checklist", text, "allow", "I approve this network/download step", "off")
+        result = self.ask("--checklist", text, "allow", "I approve this action", "off")
         return result.returncode == 0 and result.stdout.strip('" \r\n') == "allow"
 
     def status(self, text: str) -> None:
@@ -70,26 +71,35 @@ def preview(image: str | None = None) -> int:
 def _workflow(dialogs: Dialogs, paths: AppPaths, image: str | None) -> int:
     action = "copy"
     if image is None:
-        choice = dialogs.ask("--menu", "Subjector — CPU preview", "copy", "Choose an image and copy its subject",
-                             "setup", "Download / check the runtime", "register", "Add Subjector to Open With",
-                             "context", "Enable Dolphin: Copy subject", "remove", "Disable Dolphin: Copy subject")
+        choice = dialogs.ask("--menu", "Subjector", "copy", "Choose an image and copy its subject",
+                             "setup", "Set up / check runtime (automatic GPU selection)",
+                             "update", "Update or repair the runtime", "cpu", "Set up / repair using CPU only",
+                             "rollback", "Restore the previous runtime", "register", "Add Subjector to Open With",
+                             "context", "Enable Dolphin: Copy subject", "remove", "Disable Dolphin: Copy subject",
+                             "unregister", "Remove Subjector from Open With")
         if choice.returncode:
             return 0
         action = choice.stdout.strip()
-    if action in {"register", "context", "remove"}:
+    if action in {"register", "context", "remove", "unregister"}:
         _integrate(dialogs, paths, action)
+        return 0
+    if action == "rollback":
+        runtime = RuntimeStore(paths.data).rollback()
+        dialogs.ask("--msgbox", f"Previous runtime selected:\n{runtime}")
         return 0
     if action == "copy" and image is None:
         choice = dialogs.ask("--getopenfilename", str(Path.home()), "*.png *.jpg *.jpeg *.webp|Images")
         if choice.returncode or not choice.stdout.strip():
             return 0
         image = choice.stdout.rstrip("\r\n")
-    runtime = ensure_runtime(paths, dialogs.confirm, dialogs.status)
+    runtime = ensure_runtime(paths, dialogs.confirm, dialogs.status,
+                             refresh=action in {"update", "cpu"}, cpu_only=action == "cpu")
     if runtime is None:
         return 0
-    if action == "setup":
+    if action in {"setup", "update", "cpu"}:
         dialogs.close()
-        dialogs.ask("--msgbox", "The private CPU runtime is ready. No image was uploaded.")
+        note = " CPU fallback is active." if (runtime / "cpu-fallback").exists() else ""
+        dialogs.ask("--msgbox", "The private runtime is ready. No image was uploaded." + note)
         return 0
     dialogs.status("Removing the background and copying the subject…")
     copy_subject(runtime, Path(image))
@@ -106,6 +116,9 @@ def _integrate(dialogs: Dialogs, paths: AppPaths, action: str) -> None:
     if action == "remove":
         remove_context_menu(paths)
         message = "The Subjector context-menu action was removed. Open With is unchanged."
+    elif action == "unregister":
+        remove_open_with(paths)
+        message = "The Open With entry was removed. The Dolphin action is unchanged."
     else:
         destination = register(paths, launcher, context_menu=action == "context")
         if action == "register" and shutil.which("update-desktop-database"):

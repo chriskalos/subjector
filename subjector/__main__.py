@@ -1,6 +1,7 @@
 """Linux preview entry points. Diagnostics remain offline and read-only."""
 
 import argparse
+import json
 import os
 import platform
 import sys
@@ -21,7 +22,12 @@ def main(argv: list[str] | None = None) -> int:
     setup = commands.add_parser("setup", help="inspect or install after consent")
     mode = setup.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true", help="read release metadata only")
-    mode.add_argument("--install", action="store_true", help="download and validate a private CPU runtime")
+    mode.add_argument("--install", action="store_true", help="download and validate a private runtime")
+    setup.add_argument("--cpu", action="store_true", help="force CPU-only installation")
+    for command in ("update", "repair"):
+        commands.add_parser(command, help="rebuild the latest runtime after consent").add_argument(
+            "--cpu", action="store_true", help="force CPU-only installation")
+    commands.add_parser("rollback", help="restore the previous runtime without downloads")
     commands.add_parser("gui", help="open the KDE preview").add_argument("image", nargs="?")
     commands.add_parser("copy", help="copy one local image's subject").add_argument("image")
     arguments = parser.parse_args(argv)
@@ -48,9 +54,15 @@ def _dispatch(arguments: argparse.Namespace) -> int:
         from subjector.gui import preview
         return preview(arguments.image)
     paths = AppPaths.discover(os.environ, Path.home())
+    if arguments.command == "rollback":
+        print(f"Runtime selected: {RuntimeStore(paths.data).rollback()}")
+        return 0
     if arguments.command == "setup" and arguments.check:
         return check_setup(paths)
-    runtime = ensure_runtime(paths, _console_confirm, print)
+    cpu_only = getattr(arguments, "cpu", False)
+    runtime = ensure_runtime(paths, _console_confirm, print,
+                             refresh=arguments.command in {"update", "repair"} or cpu_only,
+                             cpu_only=cpu_only)
     if runtime is None:
         print("Cancelled. No runtime was installed.")
     elif arguments.command == "copy":
@@ -91,6 +103,11 @@ def _print_diagnostics() -> int:
         print("Inference runtime: not installed or verified.")
     else:
         print(f"Active runtime: {runtime}")
+        details = json.loads((runtime / "manifest.json").read_text())["validation"]
+        fallback = runtime / "cpu-fallback"
+        print(f"Backend: {'cpu (fallback)' if fallback.exists() else details.get('backend', 'unknown')}")
+        if fallback.exists():
+            print(f"Fallback reason: {fallback.read_text()[:1000]}")
         print("The active runtime was not executed by this diagnostic check.")
     return 0
 

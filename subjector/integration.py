@@ -54,6 +54,12 @@ def register(paths: AppPaths, launcher: Path, *, context_menu: bool) -> Path:
     return destination
 
 
+def remove_open_with(paths: AppPaths) -> None:
+    destination = paths.data.parent / "applications/subjector.desktop"
+    _ensure_owned(destination)
+    destination.unlink(missing_ok=True)
+
+
 def remove_context_menu(paths: AppPaths) -> None:
     destination = _service_path(paths)
     _ensure_owned(destination)
