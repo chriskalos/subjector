@@ -1,4 +1,4 @@
-"""Consent-gated metadata inspection. Runtime installation is not available yet."""
+"""Consent-gated metadata inspection, separate from runtime installation."""
 
 import sys
 
@@ -36,5 +36,5 @@ def _report_release() -> int:
     print(f"rembg wheel: {release.wheel.size:,} bytes from files.pythonhosted.org")
     print("This size excludes Python, dependencies, GPU libraries, and model weights.")
     print("Compatibility is not verified. Software was not installed.")
-    print("Runtime installation is not available in this development version.")
+    print("To install after consent, run Subjector setup --install or choose setup in the GUI.")
     return 0
